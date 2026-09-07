@@ -94,3 +94,5 @@ Thumbs.db
 .cache/
 tmp/
 temp/
+
+pipeline/.env

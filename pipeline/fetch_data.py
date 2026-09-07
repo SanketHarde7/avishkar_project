@@ -18,10 +18,17 @@ from typing import List, Dict, Any, Optional
 import requests
 import pandas as pd
 from pydantic import BaseModel, Field
+from dotenv import load_dotenv, find_dotenv
 
 # ---------------------------------------------------------
 # Configuration & Logging
 # ---------------------------------------------------------
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] [DataPipeline] %(message)s",
@@ -51,6 +58,7 @@ class StationRecord(BaseModel):
     pm25: float
     aqi: int
     status: str = Field(description="'active' or 'hidden_for_validation'")
+    data_source: str = Field(default="live", description="'live' or 'fallback'")
 
 class WeatherVectorPoint(BaseModel):
     timestamp: str
@@ -73,6 +81,7 @@ PUNE_FALLBACK_STATIONS: List[Dict[str, Any]] = [
     "pm25": 94.2,
     "aqi": 172,
     "status": "active",
+    "data_source": "fallback",
   },
   {
     "station_id": "PUN_HADAPSAR",
@@ -82,6 +91,7 @@ PUNE_FALLBACK_STATIONS: List[Dict[str, Any]] = [
     "pm25": 108.5,
     "aqi": 185,
     "status": "active",
+    "data_source": "fallback",
   },
   {
     "station_id": "PUN_KATRAJ",
@@ -91,6 +101,7 @@ PUNE_FALLBACK_STATIONS: List[Dict[str, Any]] = [
     "pm25": 68.4,
     "aqi": 124,
     "status": "active",
+    "data_source": "fallback",
   },
   {
     "station_id": "PUN_KOTHRUD",
@@ -100,6 +111,7 @@ PUNE_FALLBACK_STATIONS: List[Dict[str, Any]] = [
     "pm25": 45.1,
     "aqi": 88,
     "status": "active",
+    "data_source": "fallback",
   },
   {
     "station_id": "PUN_PASHAN",
@@ -109,6 +121,7 @@ PUNE_FALLBACK_STATIONS: List[Dict[str, Any]] = [
     "pm25": 38.0,
     "aqi": 76,
     "status": "hidden_for_validation",
+    "data_source": "fallback",
   },
   {
     "station_id": "PUN_BHOSARI",
@@ -118,6 +131,7 @@ PUNE_FALLBACK_STATIONS: List[Dict[str, Any]] = [
     "pm25": 114.7,
     "aqi": 192,
     "status": "hidden_for_validation",
+    "data_source": "fallback",
   },
 ]
 
@@ -143,72 +157,170 @@ def calculate_aqi_from_pm25(pm25: float) -> int:
 # ---------------------------------------------------------
 def fetch_openaq_stations() -> List[StationRecord]:
     """
-    Query OpenAQ API for monitoring stations in Pune within target bounding box.
-    Gracefully falls back to pre-cached verified CPCB network upon rate limit or failure.
+    Query OpenAQ v3 API for monitoring stations in Pune within target bounding box.
+    Authenticates with OPENAQ_API_KEY from .env via 'X-API-Key' header.
+    Inspects locations and queries latest sensor measurements per station.
+    Logs loud, explicit errors if API calls fail, and marks data_source as 'live' vs 'fallback'.
     """
-    logger.info("Connecting to OpenAQ API for Pune monitoring stations...")
-    url = "https://api.openaq.org/v2/locations"
+    logger.info("Connecting to OpenAQ API v3 for Pune monitoring stations...")
+
+    # 1. Load API key from .env using python-dotenv
+    load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
+    load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
+    load_dotenv(find_dotenv())
+    api_key = os.getenv("OPENAQ_API_KEY")
+
+    if not api_key:
+        logger.error(
+            "[ERROR] [CRITICAL AUTH ERROR] OPENAQ_API_KEY not found in environment or .env file! "
+            "Cannot query OpenAQ v3 API without an API key. Reverting to fallback data."
+        )
+        logger.warning("[WARNING] Using verified CPCB Pune station network fallback (data_source='fallback').")
+        return [StationRecord(**st) for st in PUNE_FALLBACK_STATIONS]
+
+    url = "https://api.openaq.org/v3/locations"
+    headers = {
+        "X-API-Key": api_key,
+        "Accept": "application/json",
+    }
+    # OpenAQ v3 bbox parameter format: min_lon,min_lat,max_lon,max_lat
     params = {
-        "coordinates": "18.5204,73.8567",
-        "radius": 25000,
-        "limit": 50,
+        "bbox": f"{PUNE_BBOX['lon_min']},{PUNE_BBOX['lat_min']},{PUNE_BBOX['lon_max']},{PUNE_BBOX['lat_max']}",
+        "limit": 100,
     }
 
     stations: List[StationRecord] = []
+    session = requests.Session()
+    session.headers.update(headers)
+
     try:
-        response = requests.get(url, params=params, timeout=10)
-        if response.status_code == 200:
+        response = session.get(url, params=params, timeout=12)
+        if response.status_code != 200:
+            logger.error(
+                f"[ERROR] [OPENAQ API ERROR] Failed to fetch locations! "
+                f"HTTP Status: {response.status_code}, Response Body: {response.text}"
+            )
+        else:
             data = response.json()
             results = data.get("results", [])
-            logger.info(f"OpenAQ returned {len(results)} locations in Pune.")
+            logger.info(f"OpenAQ v3 returned {len(results)} raw location(s) in Pune bbox.")
+
+            # Map to deduplicate by coordinate keeping newest reading
+            seen_stations: Dict[tuple, Dict[str, Any]] = {}
 
             for item in results:
                 coords = item.get("coordinates", {})
                 lat = coords.get("latitude")
                 lon = coords.get("longitude")
-                if not (lat and lon):
+                if lat is None or lon is None:
                     continue
 
                 if not (PUNE_BBOX["lat_min"] <= lat <= PUNE_BBOX["lat_max"] and
                         PUNE_BBOX["lon_min"] <= lon <= PUNE_BBOX["lon_max"]):
                     continue
 
-                # Extract PM2.5 parameter
-                pm25_val = None
-                for param in item.get("parameters", []):
-                    if param.get("parameter") == "pm25":
-                        pm25_val = param.get("lastValue")
-                        break
+                loc_id = item.get("id")
+                name = item.get("name") or f"Station-{lat:.3f}-{lon:.3f}"
+                station_id = f"PUN_{loc_id}"
 
+                # Extract PM2.5 sensor IDs for this station
+                pm25_sensor_ids = {
+                    s.get("id")
+                    for s in item.get("sensors", [])
+                    if s.get("parameter", {}).get("name", "").lower() == "pm25"
+                }
+
+                pm25_val: Optional[float] = None
+                reading_dt: str = ""
+
+                # Query latest measurements for this location
+                if loc_id is not None and pm25_sensor_ids:
+                    latest_url = f"https://api.openaq.org/v3/locations/{loc_id}/latest"
+                    try:
+                        latest_resp = session.get(latest_url, timeout=10)
+                        if latest_resp.status_code == 200:
+                            latest_data = latest_resp.json()
+                            readings = [
+                                r for r in latest_data.get("results", [])
+                                if r.get("sensorsId") in pm25_sensor_ids and r.get("value") is not None
+                            ]
+                            if readings:
+                                # Pick the most recent measurement
+                                readings.sort(
+                                    key=lambda r: (r.get("datetime") or {}).get("utc", ""),
+                                    reverse=True
+                                )
+                                pm25_val = float(readings[0]["value"])
+                                reading_dt = (readings[0].get("datetime") or {}).get("utc", "")
+                        else:
+                            logger.error(
+                                f"[ERROR] [OPENAQ API ERROR] Failed to fetch latest readings for location {loc_id} ('{name}'): "
+                                f"HTTP Status: {latest_resp.status_code}, Response Body: {latest_resp.text}"
+                            )
+                    except Exception as exc:
+                        logger.error(
+                            f"[ERROR] [NETWORK ERROR] Exception querying latest readings for location {loc_id} ('{name}'): {exc}"
+                        )
+
+                # Fallback to safe physical default if station has no current reading
                 if pm25_val is None or pm25_val <= 0:
-                    pm25_val = 65.0  # safe physical default
+                    logger.warning(
+                        f"[WARNING] Station {station_id} ('{name}') missing live PM2.5 measurement. Defaulting to 65.0 ug/m3."
+                    )
+                    pm25_val = 65.0
 
-                aqi = calculate_aqi_from_pm25(pm25_val)
-                name = item.get("name") or item.get("location") or f"Station-{lat:.3f}-{lon:.3f}"
-                station_id = f"PUN_{item.get('id', len(stations)+1)}"
+                coord_key = (round(lat, 4), round(lon, 4))
+                # If exact coordinate already seen, keep whichever has the fresher timestamp
+                if coord_key in seen_stations:
+                    existing = seen_stations[coord_key]
+                    if reading_dt <= existing.get("dt", ""):
+                        continue  # existing is newer or same
 
-                # Designate 2 stations as holdout for PINN generalization testing
+                seen_stations[coord_key] = {
+                    "station_id": station_id,
+                    "name": name,
+                    "lat": round(lat, 4),
+                    "lon": round(lon, 4),
+                    "pm25": round(float(pm25_val), 1),
+                    "dt": reading_dt,
+                }
+
+            for s_info in seen_stations.values():
+                aqi = calculate_aqi_from_pm25(s_info["pm25"])
+                name = s_info["name"]
+                # Designate holdout stations for PINN generalization testing
                 is_holdout = "pashan" in name.lower() or "bhosari" in name.lower()
                 status = "hidden_for_validation" if is_holdout else "active"
 
-                stations.append(StationRecord(
-                    station_id=station_id,
+                st_record = StationRecord(
+                    station_id=s_info["station_id"],
                     name=name,
-                    lat=round(lat, 4),
-                    lon=round(lon, 4),
-                    pm25=round(float(pm25_val), 1),
+                    lat=s_info["lat"],
+                    lon=s_info["lon"],
+                    pm25=s_info["pm25"],
                     aqi=aqi,
-                    status=status
-                ))
+                    status=status,
+                    data_source="live",
+                )
+                stations.append(st_record)
+                logger.info(
+                    f"  [OK] [LIVE] Station {st_record.station_id}: {name} (lat={st_record.lat}, lon={st_record.lon}) -> "
+                    f"PM2.5: {st_record.pm25} ug/m3, AQI: {st_record.aqi}, Status: {st_record.status}"
+                )
 
     except Exception as exc:
-        logger.warning(f"OpenAQ API unreachable or rate-limited ({exc}). Triggering offline fallback.")
+        logger.error(
+            f"[ERROR] [OPENAQ UNHANDLED ERROR] Fatal error while fetching OpenAQ v3 stations: {exc}",
+            exc_info=True,
+        )
 
     if not stations:
-        logger.info("Using verified CPCB Pune station network fallback.")
+        logger.error("[ERROR] Live OpenAQ data retrieval yielded 0 stations. Activating offline fallback network.")
+        logger.warning("[WARNING] Using verified CPCB Pune station network fallback (data_source='fallback').")
         stations = [StationRecord(**st) for st in PUNE_FALLBACK_STATIONS]
+    else:
+        logger.info(f"[SUCCESS] Loaded {len(stations)} valid monitoring stations with data_source: 'live'.")
 
-    logger.info(f"Loaded {len(stations)} valid monitoring stations in target bounding box.")
     return stations
 
 

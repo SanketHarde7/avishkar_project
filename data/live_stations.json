@@ -1,56 +1,152 @@
 [
   {
-    "station_id": "PUN_SHIVAJINAGAR",
-    "name": "Shivajinagar, Pune",
-    "lat": 18.5314,
-    "lon": 73.8446,
-    "pm25": 94.2,
-    "aqi": 172,
-    "status": "active"
+    "station_id": "PUN_2585",
+    "name": "AAQMS Karve Road Pune",
+    "lat": 18.4975,
+    "lon": 73.8135,
+    "pm25": 66.0,
+    "aqi": 120,
+    "status": "active",
+    "data_source": "live"
   },
   {
-    "station_id": "PUN_HADAPSAR",
-    "name": "Hadapsar, Pune",
-    "lat": 18.5089,
-    "lon": 73.926,
-    "pm25": 108.5,
-    "aqi": 185,
-    "status": "active"
+    "station_id": "PUN_5661",
+    "name": "Karve Road Pune, Pune - MPCB",
+    "lat": 18.5012,
+    "lon": 73.8166,
+    "pm25": 100.0,
+    "aqi": 233,
+    "status": "active",
+    "data_source": "live"
   },
   {
-    "station_id": "PUN_KATRAJ",
-    "name": "Katraj, Pune",
-    "lat": 18.4575,
-    "lon": 73.8677,
-    "pm25": 68.4,
-    "aqi": 124,
-    "status": "active"
+    "station_id": "PUN_3409331",
+    "name": "Bhosari, Pune - IITM",
+    "lat": 18.6401,
+    "lon": 73.849,
+    "pm25": 10.7,
+    "aqi": 17,
+    "status": "hidden_for_validation",
+    "data_source": "live"
   },
   {
-    "station_id": "PUN_KOTHRUD",
-    "name": "Kothrud, Pune",
-    "lat": 18.5074,
-    "lon": 73.8077,
-    "pm25": 45.1,
-    "aqi": 88,
-    "status": "active"
+    "station_id": "PUN_11609",
+    "name": "Mhada Colony, Pune - IITM",
+    "lat": 18.573,
+    "lon": 73.9277,
+    "pm25": 24.2,
+    "aqi": 40,
+    "status": "active",
+    "data_source": "live"
   },
   {
-    "station_id": "PUN_PASHAN",
-    "name": "Pashan, Pune",
-    "lat": 18.541,
-    "lon": 73.7928,
-    "pm25": 38.0,
-    "aqi": 76,
-    "status": "hidden_for_validation"
+    "station_id": "PUN_11613",
+    "name": "Revenue Colony-Shivajinagar, Pune - IITM",
+    "lat": 18.5301,
+    "lon": 73.8496,
+    "pm25": 17.1,
+    "aqi": 28,
+    "status": "active",
+    "data_source": "live"
   },
   {
-    "station_id": "PUN_BHOSARI",
-    "name": "Bhosari Industrial Area, Pune",
-    "lat": 18.6247,
-    "lon": 73.8488,
-    "pm25": 114.7,
-    "aqi": 192,
-    "status": "hidden_for_validation"
+    "station_id": "PUN_60658",
+    "name": "Hadapsar, Pune - IITM",
+    "lat": 18.5018,
+    "lon": 73.9275,
+    "pm25": 23.8,
+    "aqi": 39,
+    "status": "active",
+    "data_source": "live"
+  },
+  {
+    "station_id": "PUN_60660",
+    "name": "MIT-Kothrud, Pune - IITM",
+    "lat": 18.5178,
+    "lon": 73.8215,
+    "pm25": 17.5,
+    "aqi": 29,
+    "status": "active",
+    "data_source": "live"
+  },
+  {
+    "station_id": "PUN_3409435",
+    "name": "Gavalinagar, Pimpri Chinchwad - MPCB",
+    "lat": 18.6367,
+    "lon": 73.8249,
+    "pm25": 21.1,
+    "aqi": 35,
+    "status": "active",
+    "data_source": "live"
+  },
+  {
+    "station_id": "PUN_3409436",
+    "name": "Park Street Wakad, Pimpri Chinchwad - MPCB",
+    "lat": 18.5905,
+    "lon": 73.7795,
+    "pm25": 19.0,
+    "aqi": 31,
+    "status": "active",
+    "data_source": "live"
+  },
+  {
+    "station_id": "PUN_3409437",
+    "name": "Thergaon, Pimpri Chinchwad - MPCB",
+    "lat": 18.6163,
+    "lon": 73.7658,
+    "pm25": 5.2,
+    "aqi": 8,
+    "status": "active",
+    "data_source": "live"
+  },
+  {
+    "station_id": "PUN_3409438",
+    "name": "Katraj Dairy, Pune - MPCB",
+    "lat": 18.4545,
+    "lon": 73.8542,
+    "pm25": 13.6,
+    "aqi": 22,
+    "status": "active",
+    "data_source": "live"
+  },
+  {
+    "station_id": "PUN_3409439",
+    "name": "Savitribai Phule Pune University, Pune - MPCB",
+    "lat": 18.5471,
+    "lon": 73.8269,
+    "pm25": 7.5,
+    "aqi": 12,
+    "status": "active",
+    "data_source": "live"
+  },
+  {
+    "station_id": "PUN_3409526",
+    "name": "Panchawati_Pashan, Pune - IITM",
+    "lat": 18.5365,
+    "lon": 73.8055,
+    "pm25": 14.1,
+    "aqi": 23,
+    "status": "hidden_for_validation",
+    "data_source": "live"
+  },
+  {
+    "station_id": "PUN_3409528",
+    "name": "Savta Mali Nagar, Pimpri-Chinchwad - IITM",
+    "lat": 18.6148,
+    "lon": 73.7995,
+    "pm25": 17.1,
+    "aqi": 28,
+    "status": "active",
+    "data_source": "live"
+  },
+  {
+    "station_id": "PUN_3410005",
+    "name": "Dhankawadi, Pune - IITM",
+    "lat": 18.4599,
+    "lon": 73.8522,
+    "pm25": 15.6,
+    "aqi": 26,
+    "status": "active",
+    "data_source": "live"
   }
 ]
