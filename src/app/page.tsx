@@ -49,6 +49,12 @@ export default function DashboardPage() {
 
   // Selected Spatial Point Prediction
   const [selectedPrediction, setSelectedPrediction] = useState<PointPrediction | null>(null);
+  const selectedPredictionRef = useRef<PointPrediction | null>(null);
+
+  // Sync ref with selectedPrediction state without resetting intervals
+  useEffect(() => {
+    selectedPredictionRef.current = selectedPrediction;
+  }, [selectedPrediction]);
 
   // Active Wind State for the Current Session / Inspected Location
   const [activeWind, setActiveWind] = useState<{
@@ -233,7 +239,6 @@ export default function DashboardPage() {
   useEffect(() => {
     const liveSyncTimer = setInterval(async () => {
       try {
-        console.log('[LiveSync] Fetching 2-minute live station and spatial grid update...');
         const [freshStations, freshSlice] = await Promise.all([
           fetchStations(),
           fetchGridSlice(currentHourOffset),
@@ -257,10 +262,11 @@ export default function DashboardPage() {
         }
 
         // If a point is currently inspected, update its prediction to stay live-synced
-        if (selectedPrediction) {
+        const currentInspected = selectedPredictionRef.current;
+        if (currentInspected) {
           const freshPred = await predictPoint(
-            selectedPrediction.lat,
-            selectedPrediction.lon,
+            currentInspected.lat,
+            currentInspected.lon,
             currentHourOffset
           );
           setSelectedPrediction((prev) => {
@@ -277,7 +283,7 @@ export default function DashboardPage() {
     }, 120000); // 120,000 ms = 2 minutes
 
     return () => clearInterval(liveSyncTimer);
-  }, [currentHourOffset, selectedPrediction]);
+  }, [currentHourOffset]);
 
   // Handle forecast hour offset change
   const handleSelectHourOffset = useCallback(
