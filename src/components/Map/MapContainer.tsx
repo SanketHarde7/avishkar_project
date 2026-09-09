@@ -17,6 +17,7 @@ interface MapContainerProps {
   windDirectionDeg: number;
   u: number;
   v: number;
+  windLocationLabel?: string;
   userLocation?: [number, number] | null;
   onSelectCoordinates: (lat: number, lon: number) => void;
   onSelectStation: (station: Station) => void;

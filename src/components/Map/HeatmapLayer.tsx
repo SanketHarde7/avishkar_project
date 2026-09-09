@@ -2,52 +2,58 @@
 
 import React, { useEffect, useState } from 'react';
 import { ImageOverlay } from 'react-leaflet';
-import { GridPoint } from '@/types';
+import { GridPoint, Station } from '@/types';
 
 interface HeatmapLayerProps {
-  grid: GridPoint[];
+  grid?: GridPoint[];
+  stations?: Station[];
   bounds?: [[number, number], [number, number]];
   visible?: boolean;
+  windSpeedKmh?: number;
+  windDirectionDeg?: number;
+  u?: number;
+  v?: number;
+  center?: [number, number];
 }
 
-// Fallback bounding box for continuous spatial field overlay
+// Fallback bounding box for Pune metropolitan area
 const DEFAULT_HEATMAP_BOUNDS: [[number, number], [number, number]] = [
-  [18.45, 73.75],
-  [18.65, 73.98],
+  [18.38, 73.68],
+  [18.68, 74.02],
 ];
 
 /**
- * Continuous Color & Severity-Scaled Alpha Ramp (Tuned for light basemap contrast):
- * - 0 - 50 AQI: rgb(34, 197, 94) (Green) translucent wash (alpha ~0.18 - 0.26)
- * - 51 - 100 AQI: rgb(234, 179, 8) (Yellow) (alpha ~0.26 - 0.44)
- * - 101 - 150 AQI: rgb(249, 115, 22) (Orange) (alpha ~0.44 - 0.62)
- * - 151 - 200 AQI: rgb(239, 68, 68) (Red) (alpha ~0.62 - 0.78)
- * - 201+ AQI: rgb(168, 85, 247) (Purple) vivid focus (alpha ~0.78 - 0.88)
+ * Continuous Color Ramp calibrated to official CPCB severity breakpoints:
+ * - 0 - 50 AQI: #10b981 (Emerald Green)
+ * - 51 - 100 AQI: #84cc16 -> #f59e0b (Lime to Amber)
+ * - 101 - 150 AQI: #f59e0b -> #f97316 (Amber to Orange)
+ * - 151 - 200 AQI: #f97316 -> #ef4444 (Orange to Red)
+ * - 201+ AQI: #ef4444 -> #a855f7 (Red to Vivid Purple)
  */
 function getRampColor(aqi: number): { r: number; g: number; b: number; a: number } {
   if (aqi <= 50) {
     const t = Math.max(0, Math.min(1, aqi / 50));
     return {
-      r: 34,
-      g: 197,
-      b: 94,
-      a: 0.05 + (0.12 - 0.05) * t,
+      r: Math.round(16 + (132 - 16) * t),
+      g: Math.round(185 + (204 - 185) * t),
+      b: Math.round(129 + (22 - 129) * t),
+      a: 0.52 + (0.60 - 0.52) * t,
     };
   } else if (aqi <= 100) {
     const t = (aqi - 50) / 50;
     return {
-      r: Math.round(34 + (234 - 34) * t),
-      g: Math.round(197 + (179 - 197) * t),
-      b: Math.round(94 + (8 - 94) * t),
-      a: 0.12 + (0.24 - 0.12) * t,
+      r: Math.round(132 + (245 - 132) * t),
+      g: Math.round(204 + (158 - 204) * t),
+      b: Math.round(22 + (11 - 22) * t),
+      a: 0.60 + (0.70 - 0.60) * t,
     };
   } else if (aqi <= 150) {
     const t = (aqi - 100) / 50;
     return {
-      r: Math.round(234 + (249 - 234) * t),
-      g: Math.round(179 + (115 - 179) * t),
-      b: Math.round(8 + (22 - 8) * t),
-      a: 0.24 + (0.42 - 0.24) * t,
+      r: Math.round(245 + (249 - 245) * t),
+      g: Math.round(158 + (115 - 158) * t),
+      b: Math.round(11 + (22 - 11) * t),
+      a: 0.70 + (0.78 - 0.70) * t,
     };
   } else if (aqi <= 200) {
     const t = (aqi - 150) / 50;
@@ -55,7 +61,7 @@ function getRampColor(aqi: number): { r: number; g: number; b: number; a: number
       r: Math.round(249 + (239 - 249) * t),
       g: Math.round(115 + (68 - 115) * t),
       b: Math.round(22 + (68 - 22) * t),
-      a: 0.42 + (0.60 - 0.42) * t,
+      a: 0.78 + (0.85 - 0.78) * t,
     };
   } else {
     const t = Math.min(1, (aqi - 200) / 100);
@@ -63,13 +69,13 @@ function getRampColor(aqi: number): { r: number; g: number; b: number; a: number
       r: Math.round(239 + (168 - 239) * t),
       g: Math.round(68 + (85 - 68) * t),
       b: Math.round(68 + (247 - 68) * t),
-      a: 0.60 + (0.75 - 0.60) * t,
+      a: 0.85 + (0.92 - 0.85) * t,
     };
   }
 }
 
 /**
- * Smoothstep function for natural rectangular edge feathering
+ * Cubic Hermite smoothstep for natural organic atmospheric dissipation
  */
 function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
@@ -78,33 +84,80 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 
 export const HeatmapLayer: React.FC<HeatmapLayerProps> = ({
   grid,
+  stations,
   visible = true,
   bounds: propBounds,
+  windSpeedKmh = 10,
+  windDirectionDeg = 245,
+  u = 2.0,
+  v = 0.0,
+  center,
 }) => {
   const [overlayUrl, setOverlayUrl] = useState<string | null>(null);
   const [activeBounds, setActiveBounds] = useState<[[number, number], [number, number]]>(DEFAULT_HEATMAP_BOUNDS);
 
   useEffect(() => {
-    if (!visible || !grid || grid.length === 0) {
+    if (!visible) {
       setOverlayUrl(null);
       return;
     }
 
-    // Dynamically derive bounding coordinates from grid points or prop
-    let minLat: number, maxLat: number, minLon: number, maxLon: number;
-    if (propBounds) {
-      minLat = propBounds[0][0];
-      maxLat = propBounds[1][0];
-      minLon = propBounds[0][1];
-      maxLon = propBounds[1][1];
-    } else {
-      const lats = grid.map((pt) => pt.lat);
-      const lons = grid.map((pt) => pt.lon);
-      minLat = Math.min(...lats);
-      maxLat = Math.max(...lats);
-      minLon = Math.min(...lons);
-      maxLon = Math.max(...lons);
+    // Assemble all reference observations (ground truth stations + continuous PINN grid)
+    interface PointData {
+      lat: number;
+      lon: number;
+      aqi: number;
+      weight: number;
     }
+
+    const allPoints: PointData[] = [];
+
+    if (stations && stations.length > 0) {
+      for (const st of stations) {
+        allPoints.push({
+          lat: st.lat,
+          lon: st.lon,
+          aqi: st.aqi,
+          weight: 2.2, // Higher weight for calibrated physical ground sensors
+        });
+      }
+    }
+
+    if (grid && grid.length > 0) {
+      for (const pt of grid) {
+        allPoints.push({
+          lat: pt.lat,
+          lon: pt.lon,
+          aqi: pt.predicted_aqi,
+          weight: 1.0,
+        });
+      }
+    }
+
+    if (allPoints.length === 0) {
+      setOverlayUrl(null);
+      return;
+    }
+
+    // Calculate core data limits
+    const lats = allPoints.map((p) => p.lat);
+    const lons = allPoints.map((p) => p.lon);
+    const rawMinLat = Math.min(...lats);
+    const rawMaxLat = Math.max(...lats);
+    const rawMinLon = Math.min(...lons);
+    const rawMaxLon = Math.max(...lons);
+
+    // Expand bounding box with generous 28% natural breathing margin
+    // This guarantees that the organic atmospheric falloff decays completely to 0 alpha BEFORE reaching canvas borders
+    const latMargin = Math.max(0.045, (rawMaxLat - rawMinLat) * 0.28);
+    const lonMargin = Math.max(0.055, (rawMaxLon - rawMinLon) * 0.28);
+    const minLat = rawMinLat - latMargin;
+    const maxLat = rawMaxLat + latMargin;
+    const minLon = rawMinLon - lonMargin;
+    const maxLon = rawMaxLon + lonMargin;
+
+    const centerLat = center ? center[0] : (rawMinLat + rawMaxLat) / 2;
+    const centerLon = center ? center[1] : (rawMinLon + rawMaxLon) / 2;
 
     const resolvedBounds: [[number, number], [number, number]] = [
       [minLat, minLon],
@@ -112,10 +165,9 @@ export const HeatmapLayer: React.FC<HeatmapLayerProps> = ({
     ];
     setActiveBounds(resolvedBounds);
 
-    // Downsampled canvas grid (160x160) for fast, frame-rate safe execution
-    // Leaflet's ImageOverlay upscales with bilinear smoothing across the viewport
-    const width = 160;
-    const height = 160;
+    // High definition 260x260 canvas with bilinear smoothing across Leaflet map
+    const width = 260;
+    const height = 260;
 
     const canvas = document.createElement('canvas');
     canvas.width = width;
@@ -123,45 +175,69 @@ export const HeatmapLayer: React.FC<HeatmapLayerProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Precompute normalized positions [0, 1] for all input grid points
-    const latSpan = Math.max(0.0001, maxLat - minLat);
-    const lonSpan = Math.max(0.0001, maxLon - minLon);
-
-    const points = grid.map((pt) => ({
-      x: (pt.lon - minLon) / lonSpan,
-      y: (maxLat - pt.lat) / latSpan,
-      aqi: pt.predicted_aqi,
-    }));
-
-    const numPoints = points.length;
-    const kNeighbors = Math.min(8, numPoints);
-
     const imgData = ctx.createImageData(width, height);
     const data = imgData.data;
 
-    // Scratch buffers for k-nearest neighbor selection
-    const bestDist = new Float32Array(kNeighbors);
-    const bestAqi = new Float32Array(kNeighbors);
+    // Unit wind direction vector for dynamic physical advection elongation
+    const speed = Math.sqrt(u * u + v * v);
+    const uNorm = speed > 0.1 ? u / speed : 1.0;
+    const vNorm = speed > 0.1 ? v / speed : 0.0;
+    const cosLat = Math.cos((centerLat * Math.PI) / 180);
 
-    // 28% natural edge feathering margin for ultra-smooth non-rectangular blending
-    const featherMargin = 0.28;
-
+    const numPoints = allPoints.length;
     let pixelIdx = 0;
+
     for (let py = 0; py < height; py++) {
-      const v = py / (height - 1);
-      const distY = Math.min(v, 1 - v);
-      const featherY = smoothstep(0, featherMargin, distY);
+      const vPos = py / (height - 1);
+      const lat = maxLat - vPos * (maxLat - minLat);
 
       for (let px = 0; px < width; px++) {
-        const u = px / (width - 1);
-        const distX = Math.min(u, 1 - u);
-        const featherX = smoothstep(0, featherMargin, distX);
+        const uPos = px / (width - 1);
+        const lon = minLon + uPos * (maxLon - minLon);
 
-        // Combined natural edge feather
-        const feather = featherX * featherY;
+        // Calculate minimum distance to any observation point
+        let minD = 1e9;
+        let wSum = 0;
+        let totW = 0;
 
-        if (feather <= 0.001) {
-          // Fully transparent outside/at the bounding box edge
+        for (let i = 0; i < numPoints; i++) {
+          const pt = allPoints[i];
+          const dy = (lat - pt.lat) * 111.0;
+          const dx = (lon - pt.lon) * 111.0 * cosLat;
+          const d = Math.sqrt(dx * dx + dy * dy);
+
+          if (d < minD) {
+            minD = d;
+          }
+
+          // Wind advection coordinate transformation (elongates downwind plume)
+          const dDown = dx * uNorm + dy * vNorm;
+          const dCross = -dx * vNorm + dy * uNorm;
+
+          let dEff: number;
+          if (dDown > 0) {
+            // Downwind plume dispersion corridor
+            dEff = Math.sqrt(dCross * dCross + (dDown / 1.45) * (dDown / 1.45));
+          } else {
+            // Sharper upwind boundary
+            dEff = Math.sqrt(dCross * dCross + (dDown * 1.35) * (dDown * 1.35));
+          }
+
+          const w = pt.weight / Math.pow(dEff + 0.38, 2.1);
+          wSum += pt.aqi * w;
+          totW += w;
+        }
+
+        // Distance from metropolitan network center
+        const dyC = (lat - centerLat) * 111.0;
+        const dxC = (lon - centerLon) * 111.0 * cosLat;
+        const dCenter = Math.sqrt(dxC * dxC + dyC * dyC);
+
+        // Organic atmospheric envelope:
+        // Connected urban core retains full continuous opacity;
+        // Outer boundaries dissolve smoothly to zero with zero rectangular borders
+        const covD = minD <= 4.0 ? minD : Math.min(minD, Math.max(0, dCenter - 8.5));
+        if (covD >= 6.8) {
           data[pixelIdx] = 0;
           data[pixelIdx + 1] = 0;
           data[pixelIdx + 2] = 0;
@@ -170,46 +246,23 @@ export const HeatmapLayer: React.FC<HeatmapLayerProps> = ({
           continue;
         }
 
-        // Initialize top-k nearest neighbors
-        for (let k = 0; k < kNeighbors; k++) {
-          bestDist[k] = 1e9;
+        const falloff = covD <= 3.2 ? 1.0 : 1.0 - smoothstep(3.2, 6.8, covD);
+        if (falloff <= 0.005) {
+          data[pixelIdx] = 0;
+          data[pixelIdx + 1] = 0;
+          data[pixelIdx + 2] = 0;
+          data[pixelIdx + 3] = 0;
+          pixelIdx += 4;
+          continue;
         }
 
-        for (let i = 0; i < numPoints; i++) {
-          const pt = points[i];
-          const dx = u - pt.x;
-          const dy = v - pt.y;
-          const d2 = dx * dx + dy * dy;
-
-          if (d2 < bestDist[kNeighbors - 1]) {
-            let ins = kNeighbors - 1;
-            while (ins > 0 && d2 < bestDist[ins - 1]) {
-              bestDist[ins] = bestDist[ins - 1];
-              bestAqi[ins] = bestAqi[ins - 1];
-              ins--;
-            }
-            bestDist[ins] = d2;
-            bestAqi[ins] = pt.aqi;
-          }
-        }
-
-        // IDW Inverse-Distance-Weighted interpolation
-        let totalW = 0;
-        let weightedAqi = 0;
-        for (let k = 0; k < kNeighbors; k++) {
-          const d = Math.sqrt(bestDist[k]);
-          const w = 1 / (Math.pow(d + 0.04, 2.2));
-          totalW += w;
-          weightedAqi += bestAqi[k] * w;
-        }
-
-        const interpolatedAqi = totalW > 0 ? weightedAqi / totalW : 100;
+        const interpolatedAqi = totW > 0 ? wSum / totW : 35;
         const color = getRampColor(interpolatedAqi);
 
         data[pixelIdx] = color.r;
         data[pixelIdx + 1] = color.g;
         data[pixelIdx + 2] = color.b;
-        data[pixelIdx + 3] = Math.round(color.a * 255 * feather);
+        data[pixelIdx + 3] = Math.round(color.a * falloff * 255);
 
         pixelIdx += 4;
       }
@@ -218,7 +271,7 @@ export const HeatmapLayer: React.FC<HeatmapLayerProps> = ({
     ctx.putImageData(imgData, 0, 0);
     const dataUrl = canvas.toDataURL('image/png');
     setOverlayUrl(dataUrl);
-  }, [grid, propBounds, visible]);
+  }, [grid, stations, visible, propBounds, u, v, center]);
 
   if (!visible || !overlayUrl) return null;
 
@@ -227,7 +280,7 @@ export const HeatmapLayer: React.FC<HeatmapLayerProps> = ({
       key="continuous-pinn-heatmap"
       url={overlayUrl}
       bounds={activeBounds}
-      opacity={0.48}
+      opacity={0.72}
       zIndex={10}
     />
   );

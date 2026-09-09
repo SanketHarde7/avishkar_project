@@ -50,6 +50,21 @@ export default function DashboardPage() {
   // Selected Spatial Point Prediction
   const [selectedPrediction, setSelectedPrediction] = useState<PointPrediction | null>(null);
 
+  // Active Wind State for the Current Session / Inspected Location
+  const [activeWind, setActiveWind] = useState<{
+    windSpeedKmh: number;
+    windDirectionDeg: number;
+    u: number;
+    v: number;
+    locationLabel: string;
+  }>({
+    windSpeedKmh: 12.5,
+    windDirectionDeg: 245,
+    u: -3.14,
+    v: -1.46,
+    locationLabel: 'Pune Center',
+  });
+
   // Ref to track if geolocation was auto-triggered
   const autoDetectTriggered = useRef<boolean>(false);
 
@@ -155,6 +170,15 @@ export default function DashboardPage() {
       ...livePred,
       street_name: placeName,
     });
+    if (livePred.weather) {
+      setActiveWind({
+        windSpeedKmh: livePred.weather.wind_speed_kmh,
+        windDirectionDeg: livePred.weather.wind_direction_deg,
+        u: livePred.weather.u,
+        v: livePred.weather.v,
+        locationLabel: placeName || 'Your Location',
+      });
+    }
 
     // Step 6: Generate dynamic PINN spatial heatmap grid centered on user coordinates
     updateGridForCoordinates(lat, lon, currentHourOffset, currentSlice);
@@ -191,10 +215,69 @@ export default function DashboardPage() {
       // Default initial inspection point: Shivajinagar, Pune
       const initialPrediction = getPredictionForPoint(18.5314, 73.8446, 0);
       setSelectedPrediction(initialPrediction);
+      if (initialSlice) {
+        setActiveWind({
+          windSpeedKmh: initialSlice.wind_speed_kmh,
+          windDirectionDeg: initialSlice.wind_direction_deg,
+          u: initialSlice.u,
+          v: initialSlice.v,
+          locationLabel: 'Pune Center',
+        });
+      }
     }
 
     loadInitialData();
   }, []);
+
+  // Live synchronization: auto-update 3D station bars & spatial heatmap every 2 minutes (120s)
+  useEffect(() => {
+    const liveSyncTimer = setInterval(async () => {
+      try {
+        console.log('[LiveSync] Fetching 2-minute live station and spatial grid update...');
+        const [freshStations, freshSlice] = await Promise.all([
+          fetchStations(),
+          fetchGridSlice(currentHourOffset),
+        ]);
+
+        if (freshStations && freshStations.length > 0) {
+          setStations(freshStations);
+        }
+
+        if (freshSlice && freshSlice.grid && freshSlice.grid.length > 0) {
+          setCurrentSlice(freshSlice);
+          if (freshSlice.wind_speed_kmh) {
+            setActiveWind((prev) => ({
+              ...prev,
+              windSpeedKmh: freshSlice.wind_speed_kmh,
+              windDirectionDeg: freshSlice.wind_direction_deg,
+              u: freshSlice.u,
+              v: freshSlice.v,
+            }));
+          }
+        }
+
+        // If a point is currently inspected, update its prediction to stay live-synced
+        if (selectedPrediction) {
+          const freshPred = await predictPoint(
+            selectedPrediction.lat,
+            selectedPrediction.lon,
+            currentHourOffset
+          );
+          setSelectedPrediction((prev) => {
+            if (!prev) return null;
+            return {
+              ...freshPred,
+              street_name: prev.street_name,
+            };
+          });
+        }
+      } catch (err) {
+        console.warn('[LiveSync] 2-minute live refresh failed:', err);
+      }
+    }, 120000); // 120,000 ms = 2 minutes
+
+    return () => clearInterval(liveSyncTimer);
+  }, [currentHourOffset, selectedPrediction]);
 
   // Handle forecast hour offset change
   const handleSelectHourOffset = useCallback(
@@ -202,10 +285,23 @@ export default function DashboardPage() {
       setCurrentHourOffset(hour);
       const slice = await fetchGridSlice(hour);
 
-      // Keep spatial grid dynamic around the current city center
+      // Immediately sync city-wide wind vectors from the forecast slice
+      if (slice && slice.wind_speed_kmh !== undefined) {
+        setActiveWind((prev) => ({
+          ...prev,
+          windSpeedKmh: slice.wind_speed_kmh,
+          windDirectionDeg: slice.wind_direction_deg,
+          u: slice.u,
+          v: slice.v,
+        }));
+      }
+
+      // Use high-fidelity ONNX PINN spatial grid for Pune; generate dynamic grid for other cities
       const centerLat = selectedCity.center[0];
       const centerLon = selectedCity.center[1];
-      const dynamicGrid = generateSpatialGrid(hour, slice.u, slice.v, centerLat, centerLon);
+      const dynamicGrid = (selectedCity.id === 'pune' && slice.grid && slice.grid.length > 0)
+        ? slice.grid
+        : generateSpatialGrid(hour, slice.u, slice.v, centerLat, centerLon);
       setCurrentSlice({ ...slice, grid: dynamicGrid });
 
       // Update current inspection point prediction for the newly selected hour
@@ -219,6 +315,15 @@ export default function DashboardPage() {
           ...updated,
           street_name: selectedPrediction.street_name,
         });
+        if (updated.weather) {
+          setActiveWind((prev) => ({
+            ...prev,
+            windSpeedKmh: updated.weather.wind_speed_kmh,
+            windDirectionDeg: updated.weather.wind_direction_deg,
+            u: updated.weather.u,
+            v: updated.weather.v,
+          }));
+        }
       }
     },
     [selectedCity, selectedPrediction]
@@ -229,6 +334,15 @@ export default function DashboardPage() {
     async (lat: number, lon: number) => {
       const prediction = await predictPoint(lat, lon, currentHourOffset);
       setSelectedPrediction(prediction);
+      if (prediction.weather) {
+        setActiveWind({
+          windSpeedKmh: prediction.weather.wind_speed_kmh,
+          windDirectionDeg: prediction.weather.wind_direction_deg,
+          u: prediction.weather.u,
+          v: prediction.weather.v,
+          locationLabel: 'Selected Point',
+        });
+      }
 
       // Asynchronously resolve locality name for precision inspector readout
       const addr = await reverseGeocode(lat, lon);
@@ -239,6 +353,12 @@ export default function DashboardPage() {
           street_name: addr.name,
         };
       });
+      if (addr.name) {
+        setActiveWind((prev) => ({
+          ...prev,
+          locationLabel: addr.name,
+        }));
+      }
     },
     [currentHourOffset]
   );
@@ -251,6 +371,15 @@ export default function DashboardPage() {
         ...prediction,
         street_name: st.name,
       });
+      if (prediction.weather) {
+        setActiveWind({
+          windSpeedKmh: prediction.weather.wind_speed_kmh,
+          windDirectionDeg: prediction.weather.wind_direction_deg,
+          u: prediction.weather.u,
+          v: prediction.weather.v,
+          locationLabel: st.name,
+        });
+      }
     },
     [currentHourOffset]
   );
@@ -278,6 +407,15 @@ export default function DashboardPage() {
         ...pred,
         street_name: streetName,
       });
+      if (pred.weather) {
+        setActiveWind({
+          windSpeedKmh: pred.weather.wind_speed_kmh,
+          windDirectionDeg: pred.weather.wind_direction_deg,
+          u: pred.weather.u,
+          v: pred.weather.v,
+          locationLabel: streetName,
+        });
+      }
 
       // Cache this search location as user preference
       try {
@@ -363,10 +501,11 @@ export default function DashboardPage() {
                 grid={currentSlice?.grid || []}
                 selectedPrediction={selectedPrediction}
                 isJudgeMode={false}
-                windSpeedKmh={currentSlice?.wind_speed_kmh || 12.5}
-                windDirectionDeg={currentSlice?.wind_direction_deg || 245}
-                u={currentSlice?.u || -3.14}
-                v={currentSlice?.v || -1.46}
+                windSpeedKmh={activeWind.windSpeedKmh}
+                windDirectionDeg={activeWind.windDirectionDeg}
+                u={activeWind.u}
+                v={activeWind.v}
+                windLocationLabel={activeWind.locationLabel}
                 userLocation={userLocation}
                 onSelectCoordinates={handleSelectCoordinates}
                 onSelectStation={handleSelectStation}

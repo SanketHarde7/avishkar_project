@@ -10,6 +10,7 @@ import { HeatmapLayer } from './HeatmapLayer';
 import { WindOverlay } from './WindOverlay';
 import { Layers } from 'lucide-react';
 import { StreetSearchBar } from '../Search/StreetSearchBar';
+import { getAqiColor } from '@/lib/mockData';
 
 interface MapViewInternalProps {
   center: [number, number];
@@ -23,6 +24,7 @@ interface MapViewInternalProps {
   windDirectionDeg: number;
   u: number;
   v: number;
+  windLocationLabel?: string;
   userLocation?: [number, number] | null;
   onSelectCoordinates: (lat: number, lon: number) => void;
   onSelectStation: (station: Station) => void;
@@ -75,6 +77,7 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
   windDirectionDeg,
   u,
   v,
+  windLocationLabel,
   userLocation,
   onSelectCoordinates,
   onSelectStation,
@@ -92,6 +95,7 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
         windDirectionDeg={windDirectionDeg}
         u={u}
         v={v}
+        locationLabel={windLocationLabel}
       />
 
       {/* Street & Neighborhood Search Bar HUD (Floating Center-Top, bounded away from left/right widgets) */}
@@ -104,17 +108,17 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
       </div>
 
       {/* Layer Mode Switcher HUD (2D Heatmap / 2.5D Columns / Hybrid) */}
-      <div className="absolute top-3 right-3 z-[1000] flex items-center bg-surface/95 backdrop-blur-md border border-border p-1 rounded-[6px] text-xs pointer-events-auto shadow-md">
-        <div className="hidden lg:flex items-center gap-1 px-1.5 text-text-muted">
-          <Layers className="w-3.5 h-3.5 text-text-secondary" />
-          <span className="text-[11px] font-medium">Layer:</span>
+      <div className="absolute top-3 right-3 z-[1000] flex items-center bg-[#0f1117]/95 backdrop-blur-md border border-slate-700/80 p-1 rounded-lg text-xs pointer-events-auto shadow-[0_8px_30px_rgba(0,0,0,0.45)]">
+        <div className="hidden lg:flex items-center gap-1 px-2 text-slate-300 font-semibold">
+          <Layers className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-[11px]">Layer:</span>
         </div>
         <button
           onClick={() => setLayerMode('2d')}
-          className={`px-2 py-1 rounded-[4px] font-medium transition-colors text-xs ${
+          className={`px-2.5 py-1 rounded-[6px] font-semibold transition-all text-xs ${
             layerMode === '2d'
-              ? 'bg-surface-raised text-accent border border-border-strong'
-              : 'text-text-muted hover:text-text-primary'
+              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm'
+              : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
           }`}
           title="2D Continuous PINN Advection Heatmap"
         >
@@ -123,10 +127,10 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
         </button>
         <button
           onClick={() => setLayerMode('25d')}
-          className={`px-2 py-1 rounded-[4px] font-medium transition-colors text-xs ${
+          className={`px-2.5 py-1 rounded-[6px] font-semibold transition-all text-xs ${
             layerMode === '25d'
-              ? 'bg-surface-raised text-accent border border-border-strong'
-              : 'text-text-muted hover:text-text-primary'
+              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm'
+              : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
           }`}
           title="2.5D Extruded Vertical Columns (Height = Pollution)"
         >
@@ -135,10 +139,10 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
         </button>
         <button
           onClick={() => setLayerMode('both')}
-          className={`px-2 py-1 rounded-[4px] font-medium transition-colors text-xs ${
+          className={`px-2.5 py-1 rounded-[6px] font-semibold transition-all text-xs ${
             layerMode === 'both'
-              ? 'bg-surface-raised text-accent border border-border-strong'
-              : 'text-text-muted hover:text-text-primary'
+              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm'
+              : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
           }`}
           title="Combined 2D Heatmap and 2.5D Columns"
         >
@@ -147,33 +151,33 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
       </div>
 
       {/* Map Legend Overlay matching continuous color ramp */}
-      <div className="absolute bottom-4 left-4 z-[1000] bg-surface/95 backdrop-blur-sm border border-border text-text-primary p-3 rounded-[2px] text-xs space-y-1.5 pointer-events-auto">
-        <div className="panel-label">Predicted AQI field</div>
+      <div className="absolute bottom-4 left-4 z-[1000] bg-[#0f1117]/95 backdrop-blur-md border border-slate-700/80 text-white p-3 rounded-lg text-xs space-y-1.5 pointer-events-auto shadow-[0_8px_30px_rgba(0,0,0,0.45)]">
+        <div className="text-[10px] font-bold text-slate-300 tracking-wide uppercase">Predicted AQI field</div>
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#10b981]" />
-          <span className="text-text-secondary tnum">0–50 Good</span>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#10b981] shadow-sm" />
+          <span className="text-slate-200 font-medium tnum">0–50 Good</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#84cc16]" />
-          <span className="text-text-secondary tnum">51–100 Moderate</span>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#84cc16] shadow-sm" />
+          <span className="text-slate-200 font-medium tnum">51–100 Moderate</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#f59e0b]" />
-          <span className="text-text-secondary tnum">101–150 Poor</span>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b] shadow-sm" />
+          <span className="text-slate-200 font-medium tnum">101–150 Poor</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#f97316]" />
-          <span className="text-text-secondary tnum">151–200 Unhealthy</span>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#f97316] shadow-sm" />
+          <span className="text-slate-200 font-medium tnum">151–200 Unhealthy</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
-          <span className="text-text-secondary tnum">201+ Severe</span>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444] shadow-sm" />
+          <span className="text-slate-200 font-medium tnum">201+ Severe</span>
         </div>
 
         {isJudgeMode && (
-          <div className="pt-2 mt-1.5 border-t border-border">
-            <div className="flex items-center gap-2 text-[11px] text-text-secondary">
-              <span className="w-2 h-2 rounded-full border border-dashed border-text-muted bg-border-strong" />
+          <div className="pt-2 mt-1.5 border-t border-slate-700">
+            <div className="flex items-center gap-2 text-[11px] text-slate-300">
+              <span className="w-2.5 h-2.5 rounded-full border border-dashed border-slate-400 bg-slate-700" />
               <span>Withheld test sensor</span>
             </div>
           </div>
@@ -201,7 +205,18 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
         />
 
         {/* Smooth Continuous PINN Gradient Image Overlay */}
-        {(layerMode === '2d' || layerMode === 'both') && <HeatmapLayer grid={grid} bounds={bounds} />}
+        {(layerMode === '2d' || layerMode === 'both') && (
+          <HeatmapLayer
+            grid={grid}
+            bounds={bounds}
+            stations={stations}
+            windSpeedKmh={windSpeedKmh}
+            windDirectionDeg={windDirectionDeg}
+            u={u}
+            v={v}
+            center={center}
+          />
+        )}
 
         {/* 2D Flat CPCB Ground Truth Station Markers */}
         {layerMode === '2d' && (
@@ -250,42 +265,50 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
         )}
 
         {/* Highlight User-Selected Inspection Coordinate — Precision Reticle */}
-        {selectedPrediction && (
-          <>
-            <CircleMarker
-              center={[selectedPrediction.lat, selectedPrediction.lon]}
-              radius={18}
-              pathOptions={{
-                color: '#b45309',
-                weight: 1.5,
-                dashArray: '4, 4',
-                fillColor: '#f59e0b',
-                fillOpacity: 0.2,
-              }}
-              interactive={false}
-            />
-            <CircleMarker
-              center={[selectedPrediction.lat, selectedPrediction.lon]}
-              radius={6}
-              pathOptions={{
-                color: '#0f172a',
-                weight: 2,
-                fillColor: '#f59e0b',
-                fillOpacity: 1,
-              }}
-            >
-              {selectedPrediction.street_name && (
-                <Tooltip permanent direction="top" offset={[0, -10]} opacity={0.95}>
-                  <div className="bg-surface text-text-primary px-2 py-1 rounded-[2px] text-[11px] font-medium border border-accent/60 shadow-lg flex items-center gap-1.5 whitespace-nowrap">
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                    <span>{selectedPrediction.street_name}</span>
-                    <span className="font-mono text-accent font-semibold ml-1">AQI {selectedPrediction.predicted_aqi}</span>
-                  </div>
-                </Tooltip>
-              )}
-            </CircleMarker>
-          </>
-        )}
+        {selectedPrediction && (() => {
+          const reticleColor = getAqiColor(selectedPrediction.predicted_aqi);
+          return (
+            <>
+              <CircleMarker
+                center={[selectedPrediction.lat, selectedPrediction.lon]}
+                radius={18}
+                pathOptions={{
+                  color: reticleColor,
+                  weight: 2,
+                  dashArray: '4, 4',
+                  fillColor: reticleColor,
+                  fillOpacity: 0.22,
+                }}
+                interactive={false}
+              />
+              <CircleMarker
+                center={[selectedPrediction.lat, selectedPrediction.lon]}
+                radius={6}
+                pathOptions={{
+                  color: '#0f172a',
+                  weight: 2,
+                  fillColor: reticleColor,
+                  fillOpacity: 1,
+                }}
+              >
+                {selectedPrediction.street_name && (
+                  <Tooltip permanent direction="top" offset={[0, -10]} opacity={0.95}>
+                    <div
+                      className="bg-surface text-text-primary px-2.5 py-1 rounded-[4px] text-[11px] font-medium shadow-xl flex items-center gap-1.5 whitespace-nowrap"
+                      style={{ border: `1px solid ${reticleColor}80` }}
+                    >
+                      <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: reticleColor }} />
+                      <span>{selectedPrediction.street_name}</span>
+                      <span className="font-mono font-bold ml-1" style={{ color: reticleColor }}>
+                        AQI {selectedPrediction.predicted_aqi}
+                      </span>
+                    </div>
+                  </Tooltip>
+                )}
+              </CircleMarker>
+            </>
+          );
+        })()}
       </MapContainer>
     </div>
   );
