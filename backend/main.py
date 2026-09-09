@@ -729,6 +729,246 @@ def get_grid_slice(hour_offset: float = Query(0.0, description="Forecast hour of
     }
 
 
+# ---------------------------------------------------------
+# Smart Sensor Network Optimization Engine
+# ---------------------------------------------------------
+class OptimizeSensorsRequest(BaseModel):
+    count: int = Field(3, ge=1, le=15, description="Number of additional sensors to deploy")
+    hour_offset: float = Field(0.0, ge=0.0, le=24.0, description="Forecast hour offset")
+
+
+def optimize_sensor_placement(count: int = 3, hour_offset: float = 0.0) -> Dict[str, Any]:
+    """
+    Deterministically computes optimal placement for N additional air quality sensors.
+    Balances:
+      1. Pollution Risk: Severity of predicted PM2.5/AQI in candidate cell.
+      2. Spatial Monitoring Gap: Physical distance to nearest active CPCB sensor.
+      3. Spatial Information / Uncertainty Proxy: Observational sparsity and gradient.
+      4. Redundancy Avoidance: Diversity-aware greedy suppression within 2.8 km.
+    Computes rigorous baseline vs. optimized network impact metrics over the spatial grid.
+    """
+    import time
+    start_time = time.time()
+
+    # 1. Fetch grid slice for the target hour offset
+    slice_data = get_grid_slice(hour_offset=hour_offset)
+    candidates = slice_data.get("grid", [])
+
+    if not candidates:
+        raise HTTPException(status_code=500, detail="Unable to generate candidate spatial grid")
+
+    # Filter active stations for physical ground truth
+    all_stations = state.get("stations", DEFAULT_STATIONS)
+    active_stations = [s for s in all_stations if s.get("status") != "hidden_for_validation"]
+    if not active_stations:
+        active_stations = all_stations
+
+    # 2. Extract PM2.5 statistics for normalization
+    pm25_vals = [c["predicted_pm25"] for c in candidates]
+    min_pm25 = min(pm25_vals)
+    max_pm25 = max(pm25_vals)
+    pm25_range = max(1.0, max_pm25 - min_pm25)
+    median_pm25 = float(np.median(pm25_vals))
+
+    # Precalculate nearest station distances and baseline stats for all candidates
+    candidate_features = []
+    baseline_distances = []
+
+    for c in candidates:
+        lat = c["lat"]
+        lon = c["lon"]
+        pm25 = c["predicted_pm25"]
+        aqi = c["predicted_aqi"]
+
+        # Distance to nearest active station
+        nearest_st_name, nearest_dist = find_nearest_sensor(lat, lon, active_stations)
+        baseline_distances.append(nearest_dist)
+
+        # Normalized pollution risk score [0, 1]
+        risk_score = round(max(0.0, min(1.0, (pm25 - min_pm25) / pm25_range)), 4)
+
+        # Normalized coverage gap score [0, 1] (capped at 7.5 km)
+        coverage_gap_score = round(max(0.0, min(1.0, nearest_dist / 7.5)), 4)
+
+        # Transparent spatial uncertainty / information value proxy [0, 1]
+        # Combines observational distance void with elevated pollution activity
+        info_value_score = round(max(0.0, min(1.0, 0.65 * coverage_gap_score + 0.35 * risk_score)), 4)
+
+        # Raw composite priority score
+        base_score = round(0.40 * risk_score + 0.35 * coverage_gap_score + 0.25 * info_value_score, 4)
+
+        candidate_features.append({
+            "lat": lat,
+            "lon": lon,
+            "predicted_pm25": pm25,
+            "predicted_aqi": aqi,
+            "nearest_station_km": round(nearest_dist, 2),
+            "nearest_station_name": nearest_st_name,
+            "risk_score": risk_score,
+            "coverage_gap_score": coverage_gap_score,
+            "info_value_score": info_value_score,
+            "base_score": base_score,
+        })
+
+    # 3. Greedy Sequential Selection with Redundancy Suppression
+    selected_recommendations: List[Dict[str, Any]] = []
+    selected_indices: List[int] = []
+    suppression_radius_km = 2.8
+
+    for rank in range(1, min(count, len(candidate_features)) + 1):
+        best_idx = -1
+        best_effective_score = -1.0
+        best_candidate: Optional[Dict[str, Any]] = None
+
+        for idx, cand in enumerate(candidate_features):
+            if idx in selected_indices:
+                continue
+
+            # Compute redundancy penalty against already selected sensors
+            if selected_recommendations:
+                min_dist_to_selected = min(
+                    haversine_km(cand["lat"], cand["lon"], sel["lat"], sel["lon"])
+                    for sel in selected_recommendations
+                )
+                # Gaussian spatial suppression penalty
+                penalty = math.exp(-((min_dist_to_selected / suppression_radius_km) ** 2))
+                effective_score = cand["base_score"] * max(0.05, 1.0 - 0.75 * penalty)
+            else:
+                effective_score = cand["base_score"]
+
+            if effective_score > best_effective_score:
+                best_effective_score = effective_score
+                best_idx = idx
+                best_candidate = cand
+
+        if best_candidate is not None and best_idx != -1:
+            selected_indices.append(best_idx)
+
+            # Determine explainable reason codes
+            reasons = []
+            if best_candidate["risk_score"] >= 0.60:
+                reasons.append("HIGH_POLLUTION")
+            if best_candidate["coverage_gap_score"] >= 0.55:
+                reasons.append("LARGE_MONITORING_GAP")
+            if best_candidate["nearest_station_km"] >= 4.5:
+                reasons.append("UNMONITORED_CORRIDOR")
+            if best_candidate["info_value_score"] >= 0.65:
+                reasons.append("HIGH_INFORMATION_VALUE")
+            if not reasons:
+                reasons.append("BALANCED_COVERAGE_PRIORITY")
+
+            # Formulate clear urban-planning justification
+            dist_txt = f"{best_candidate['nearest_station_km']} km from {best_candidate['nearest_station_name']}"
+            if "HIGH_POLLUTION" in reasons and "LARGE_MONITORING_GAP" in reasons:
+                expl = f"Elevated pollution exposure ({best_candidate['predicted_aqi']} AQI) in a critical observational void located {dist_txt}."
+            elif "LARGE_MONITORING_GAP" in reasons:
+                expl = f"Major municipal coverage void located {dist_txt}; deploying here significantly contracts suburban monitoring blindspots."
+            elif "HIGH_POLLUTION" in reasons:
+                expl = f"Persistent emission accumulation ({best_candidate['predicted_pm25']} µg/m³ PM2.5) with insufficient local sensor density."
+            else:
+                expl = f"Optimal spatial positioning to bridge the observation gap between existing stations ({dist_txt})."
+
+            priority_int = int(round(best_effective_score * 100))
+            selected_recommendations.append({
+                "rank": rank,
+                "lat": round(best_candidate["lat"], 4),
+                "lon": round(best_candidate["lon"], 4),
+                "priority_score": priority_int,
+                "predicted_pm25": round(float(best_candidate["predicted_pm25"]), 1),
+                "predicted_aqi": int(best_candidate["predicted_aqi"]),
+                "nearest_station_km": best_candidate["nearest_station_km"],
+                "nearest_station_name": best_candidate["nearest_station_name"],
+                "coverage_gap_score": round(best_candidate["coverage_gap_score"], 2),
+                "pollution_risk_score": round(best_candidate["risk_score"], 2),
+                "information_value_score": round(best_candidate["info_value_score"], 2),
+                "reason_codes": reasons,
+                "explanation": expl,
+            })
+
+    # 4. Rigorous Network Impact Calculations
+    # Coverage threshold = 3.0 km (standard urban monitoring representativeness radius)
+    COVERAGE_RADIUS_KM = 3.0
+    total_cells = len(candidates)
+
+    baseline_mean_dist = float(np.mean(baseline_distances))
+    baseline_max_dist = float(np.max(baseline_distances))
+    baseline_covered_count = sum(1 for d in baseline_distances if d <= COVERAGE_RADIUS_KM)
+    baseline_coverage_pct = round((baseline_covered_count / total_cells) * 100, 1)
+
+    # High-risk cells coverage
+    high_risk_indices = [i for i, c in enumerate(candidate_features) if c["predicted_pm25"] >= median_pm25]
+    baseline_hr_covered = sum(1 for i in high_risk_indices if baseline_distances[i] <= COVERAGE_RADIUS_KM)
+    baseline_hr_pct = round((baseline_hr_covered / max(1, len(high_risk_indices))) * 100, 1)
+
+    # Augmented network distances (active stations + recommended sensors)
+    augmented_distances = []
+    for i, c in enumerate(candidate_features):
+        d_base = baseline_distances[i]
+        d_rec_min = min(
+            haversine_km(c["lat"], c["lon"], rec["lat"], rec["lon"])
+            for rec in selected_recommendations
+        ) if selected_recommendations else d_base
+        augmented_distances.append(min(d_base, d_rec_min))
+
+    optimized_mean_dist = float(np.mean(augmented_distances))
+    optimized_max_dist = float(np.max(augmented_distances))
+    optimized_covered_count = sum(1 for d in augmented_distances if d <= COVERAGE_RADIUS_KM)
+    optimized_coverage_pct = round((optimized_covered_count / total_cells) * 100, 1)
+
+    optimized_hr_covered = sum(1 for i in high_risk_indices if augmented_distances[i] <= COVERAGE_RADIUS_KM)
+    optimized_hr_pct = round((optimized_hr_covered / max(1, len(high_risk_indices))) * 100, 1)
+
+    # Coverage improvement percentage based on reduction of mean monitoring void distance
+    mean_dist_improvement_pct = round(
+        ((baseline_mean_dist - optimized_mean_dist) / max(0.1, baseline_mean_dist)) * 100, 1
+    )
+    hr_coverage_improvement_pct = round(optimized_hr_pct - baseline_hr_pct, 1)
+
+    elapsed_ms = round((time.time() - start_time) * 1000, 1)
+
+    return {
+        "city": "Pune",
+        "hour_offset": int(hour_offset),
+        "candidate_count": total_cells,
+        "recommended_count": len(selected_recommendations),
+        "recommendations": selected_recommendations,
+        "network_summary": {
+            "existing_station_count": len(active_stations),
+            "recommended_new_sensors": len(selected_recommendations),
+            "coverage_improvement_pct": mean_dist_improvement_pct,
+            "baseline_mean_nearest_sensor_km": round(baseline_mean_dist, 2),
+            "optimized_mean_nearest_sensor_km": round(optimized_mean_dist, 2),
+            "baseline_max_distance_km": round(baseline_max_dist, 2),
+            "optimized_max_distance_km": round(optimized_max_dist, 2),
+            "baseline_coverage_pct": baseline_coverage_pct,
+            "optimized_coverage_pct": optimized_coverage_pct,
+            "high_risk_coverage_improvement_pct": hr_coverage_improvement_pct,
+        },
+        "is_fallback": False,
+        "computation_time_ms": elapsed_ms,
+    }
+
+
+@app.get("/api/optimize-sensors")
+def get_sensor_optimization(
+    count: int = Query(3, ge=1, le=15, description="Number of additional sensors"),
+    hour_offset: float = Query(0.0, ge=0.0, le=24.0, description="Forecast hour offset"),
+):
+    """
+    Returns optimal sensor deployment recommendations and spatial network impact analysis.
+    """
+    return optimize_sensor_placement(count=count, hour_offset=hour_offset)
+
+
+@app.post("/api/optimize-sensors")
+def post_sensor_optimization(payload: OptimizeSensorsRequest):
+    """
+    POST variant for sensor placement optimization.
+    """
+    return optimize_sensor_placement(count=payload.count, hour_offset=payload.hour_offset)
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+

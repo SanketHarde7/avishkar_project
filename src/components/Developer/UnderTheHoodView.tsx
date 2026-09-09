@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import { Cpu, ShieldCheck, Activity, Layers, ArrowLeft, RefreshCw, AlertCircle } from 'lucide-react';
+import { Cpu, ShieldCheck, Activity, Layers, ArrowLeft, RefreshCw, AlertCircle, Network } from 'lucide-react';
 import { fetchModelBenchmarks } from '@/lib/api';
 import { ModelBenchmarkResponse, LoocvFoldRecord } from '@/types';
 
@@ -225,6 +225,26 @@ export const UnderTheHoodView: React.FC<UnderTheHoodViewProps> = ({ onBackToMoni
             <div className="text-[10px] text-text-muted">Single-thread CPU</div>
           </div>
         </div>
+      </div>
+
+      {/* Decision Support Reference Card */}
+      <div className="bg-surface-raised/60 rounded-[4px] p-3 border border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-accent flex-shrink-0">
+            <Network className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-text-primary">
+              Sensor Placement Optimization
+            </div>
+            <div className="text-[11px] text-text-muted">
+              Decision-support layer using spatial risk, coverage gaps, and network diversification.
+            </div>
+          </div>
+        </div>
+        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface border border-border text-accent font-semibold flex-shrink-0">
+          See &quot;Sensor Optimization&quot; Tab
+        </span>
       </div>
 
       {/* 1. Multi-Model Benchmark Comparison */}

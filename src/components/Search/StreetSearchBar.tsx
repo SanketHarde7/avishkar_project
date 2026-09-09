@@ -2,48 +2,34 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, MapPin, Navigation, X, Sparkles } from 'lucide-react';
+import { searchPlacesPanIndia } from '@/lib/geocoding';
 
 export interface StreetLocation {
   name: string;
   area: string;
   lat: number;
   lon: number;
-  category: 'Commercial' | 'Residential' | 'Tech Park' | 'Industrial' | 'Transit';
+  category: 'Commercial' | 'Residential' | 'Tech Park' | 'Industrial' | 'Transit' | 'Landmark' | 'City';
 }
 
-export const PUNE_PRESET_LOCATIONS: StreetLocation[] = [
-  { name: 'FC Road (Fergusson College Road)', area: 'Deccan Gymkhana', lat: 18.5204, lon: 73.8402, category: 'Commercial' },
-  { name: 'JM Road (Jangali Maharaj Road)', area: 'Shivajinagar', lat: 18.5262, lon: 73.8475, category: 'Commercial' },
-  { name: 'Kothrud (Karve Statue & Paud Rd)', area: 'Kothrud', lat: 18.5074, lon: 73.8077, category: 'Residential' },
-  { name: 'Karve Road (Near Garware College)', area: 'Erandwane', lat: 18.5042, lon: 73.8291, category: 'Commercial' },
-  { name: 'Hinjewadi Phase 1 (Wipro Circle)', area: 'Hinjewadi IT Park', lat: 18.5912, lon: 73.7389, category: 'Tech Park' },
-  { name: 'Hinjewadi Phase 2 & 3', area: 'Hinjewadi Phase 3', lat: 18.5840, lon: 73.7020, category: 'Tech Park' },
-  { name: 'Baner High Street', area: 'Baner', lat: 18.5642, lon: 73.7769, category: 'Commercial' },
-  { name: 'Viman Nagar (Near Phoenix Mall)', area: 'Viman Nagar', lat: 18.5679, lon: 73.9143, category: 'Commercial' },
-  { name: 'Koregaon Park (North Main Road)', area: 'Koregaon Park', lat: 18.5362, lon: 73.8940, category: 'Residential' },
-  { name: 'Aundh (Parihar Chowk)', area: 'Aundh', lat: 18.5580, lon: 73.8075, category: 'Commercial' },
-  { name: 'Magarpatta Cybercity', area: 'Hadapsar', lat: 18.5147, lon: 73.9268, category: 'Tech Park' },
-  { name: 'Kharadi (EON Free Zone)', area: 'Kharadi', lat: 18.5518, lon: 73.9512, category: 'Tech Park' },
-  { name: 'Swargate Bus Terminal & Chowk', area: 'Swargate', lat: 18.5018, lon: 73.8586, category: 'Transit' },
-  { name: 'Kalyani Nagar (Cerebrum IT Park)', area: 'Kalyani Nagar', lat: 18.5482, lon: 73.9034, category: 'Commercial' },
-  { name: 'Senapati Bapat Road (ICC Towers)', area: 'SB Road', lat: 18.5322, lon: 73.8298, category: 'Commercial' },
-  { name: 'Pashan (Panchawati & Lake)', area: 'Pashan', lat: 18.5410, lon: 73.7928, category: 'Residential' },
-  { name: 'Bhosari MIDC (Industrial Hub)', area: 'Bhosari', lat: 18.6247, lon: 73.8488, category: 'Industrial' },
-  { name: 'Wakad (Datta Mandir Chowk)', area: 'Wakad', lat: 18.5985, lon: 73.7652, category: 'Residential' },
-  { name: 'Katraj (Dairy & Bharati Vidyapeeth)', area: 'Katraj', lat: 18.4575, lon: 73.8677, category: 'Residential' },
-  { name: 'Savitribai Phule Pune University', area: 'Ganeshkhind', lat: 18.5529, lon: 73.8260, category: 'Residential' },
-  { name: 'Bavdhan (Chandani Chowk Junction)', area: 'Bavdhan', lat: 18.5098, lon: 73.7745, category: 'Residential' },
-  { name: 'Camp (MG Road & East Street)', area: 'Pune Cantonment', lat: 18.5167, lon: 73.8790, category: 'Commercial' },
+export const PAN_INDIA_PRESET_LOCATIONS: StreetLocation[] = [
+  { name: 'FC Road (Fergusson College Road)', area: 'Deccan Gymkhana, Pune', lat: 18.5204, lon: 73.8402, category: 'Commercial' },
+  { name: 'Connaught Place', area: 'Central Delhi, New Delhi', lat: 28.6315, lon: 77.2167, category: 'Commercial' },
+  { name: 'Marine Drive & Nariman Point', area: 'South Mumbai, Maharashtra', lat: 18.9438, lon: 72.8232, category: 'Landmark' },
+  { name: 'Hinjewadi IT Park', area: 'Pimpri-Chinchwad, Pune', lat: 18.5912, lon: 73.7389, category: 'Tech Park' },
+  { name: 'MG Road & Brigade Road', area: 'Central Bengaluru, Karnataka', lat: 12.9756, lon: 77.6066, category: 'Commercial' },
+  { name: 'Sector 62 IT Hub', area: 'Noida, Uttar Pradesh', lat: 28.6276, lon: 77.3639, category: 'Tech Park' },
+  { name: 'Bandra Kurla Complex (BKC)', area: 'Bandra East, Mumbai', lat: 19.0657, lon: 72.8687, category: 'Commercial' },
+  { name: 'Kothrud (Karve Road)', area: 'Kothrud, Pune', lat: 18.5074, lon: 73.8077, category: 'Residential' },
 ];
 
 const QUICK_CHIPS = [
-  { label: 'FC Road', lat: 18.5204, lon: 73.8402, name: 'FC Road, Deccan Gymkhana' },
-  { label: 'Kothrud', lat: 18.5074, lon: 73.8077, name: 'Kothrud (Karve Statue)' },
-  { label: 'Hinjewadi', lat: 18.5912, lon: 73.7389, name: 'Hinjewadi Phase 1' },
-  { label: 'Viman Nagar', lat: 18.5679, lon: 73.9143, name: 'Viman Nagar' },
-  { label: 'Baner', lat: 18.5642, lon: 73.7769, name: 'Baner High Street' },
-  { label: 'Aundh', lat: 18.5580, lon: 73.8075, name: 'Aundh (Parihar Chowk)' },
-  { label: 'Magarpatta', lat: 18.5147, lon: 73.9268, name: 'Magarpatta Cybercity' },
+  { label: 'Pune', lat: 18.5204, lon: 73.8567, name: 'Pune, Maharashtra' },
+  { label: 'Mumbai', lat: 19.0760, lon: 72.8777, name: 'Mumbai, Maharashtra' },
+  { label: 'Delhi NCR', lat: 28.6139, lon: 77.2090, name: 'Delhi NCR' },
+  { label: 'Bengaluru', lat: 12.9716, lon: 77.5946, name: 'Bengaluru, Karnataka' },
+  { label: 'Nashik', lat: 19.9975, lon: 73.7898, name: 'Nashik, Maharashtra' },
+  { label: 'Hinjewadi', lat: 18.5912, lon: 73.7389, name: 'Hinjewadi Phase 1, Pune' },
 ];
 
 interface StreetSearchBarProps {
@@ -79,49 +65,39 @@ export const StreetSearchBar: React.FC<StreetSearchBarProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Filter local presets or fallback to Nominatim
+  // Filter local presets or fallback to Pan-India Nominatim search
   useEffect(() => {
     if (!query.trim()) {
-      setResults(PUNE_PRESET_LOCATIONS.slice(0, 6));
+      setResults(PAN_INDIA_PRESET_LOCATIONS.slice(0, 6));
       return;
     }
 
     const q = query.toLowerCase().trim();
-    const matched = PUNE_PRESET_LOCATIONS.filter(
+    const matched = PAN_INDIA_PRESET_LOCATIONS.filter(
       (loc) => loc.name.toLowerCase().includes(q) || loc.area.toLowerCase().includes(q)
     );
 
-    if (matched.length > 0) {
-      setResults(matched);
-      setIsSearchingOnline(false);
-    } else {
-      // Search online via OpenStreetMap Nominatim for Pune
-      const timer = setTimeout(async () => {
-        setIsSearchingOnline(true);
-        try {
-          const resp = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ' Pune')}&bounded=1&viewbox=73.70,18.70,74.05,18.40&limit=5`
-          );
-          if (resp.ok) {
-            const data = await resp.json();
-            const onlineResults: StreetLocation[] = data.map((item: any) => ({
-              name: item.display_name.split(',')[0],
-              area: item.display_name.split(',').slice(1, 3).join(',').trim(),
-              lat: parseFloat(item.lat),
-              lon: parseFloat(item.lon),
-              category: 'Residential',
-            }));
-            setResults(onlineResults);
-          }
-        } catch (e) {
-          console.error('Nominatim search failed:', e);
-        } finally {
-          setIsSearchingOnline(false);
+    // Search online via OpenStreetMap Nominatim across Pan-India
+    const timer = setTimeout(async () => {
+      setIsSearchingOnline(true);
+      try {
+        const onlineResults = await searchPlacesPanIndia(query);
+        if (onlineResults.length > 0) {
+          setResults(onlineResults);
+        } else if (matched.length > 0) {
+          setResults(matched);
+        } else {
+          setResults([]);
         }
-      }, 350);
+      } catch (e) {
+        console.error('Pan-India Nominatim search failed:', e);
+        setResults(matched);
+      } finally {
+        setIsSearchingOnline(false);
+      }
+    }, 300);
 
-      return () => clearTimeout(timer);
-    }
+    return () => clearTimeout(timer);
   }, [query]);
 
   // Click outside listener
@@ -165,7 +141,7 @@ export const StreetSearchBar: React.FC<StreetSearchBarProps> = ({
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          placeholder="Search your street, neighborhood or landmark in Pune... (Press '/' to focus)"
+          placeholder="Search any street, town, or city across India... (Press '/' to focus)"
           className="w-full py-2 bg-transparent text-xs text-text-primary placeholder:text-text-muted focus:outline-none"
         />
 
@@ -200,7 +176,7 @@ export const StreetSearchBar: React.FC<StreetSearchBarProps> = ({
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-surface/95 backdrop-blur-md border border-border rounded-[6px] shadow-2xl overflow-hidden max-h-72 overflow-y-auto">
           <div className="px-3 py-1.5 text-[10px] font-semibold text-text-muted border-b border-border/50 flex items-center justify-between">
-            <span>{query ? 'MATCHING PUNE STREETS & LOCALITIES' : 'POPULAR PUNE NEIGHBORHOODS'}</span>
+            <span>{query ? 'PAN-INDIA SEARCH RESULTS' : 'POPULAR CITIES & LOCALITIES'}</span>
             {isSearchingOnline && (
               <span className="flex items-center gap-1 text-accent">
                 <Sparkles className="w-3 h-3 animate-pulse" />
@@ -211,7 +187,9 @@ export const StreetSearchBar: React.FC<StreetSearchBarProps> = ({
 
           {results.length === 0 ? (
             <div className="p-4 text-center text-xs text-text-muted">
-              No matching streets found in Pune. Try searching for major landmarks or neighborhoods.
+              {isSearchingOnline
+                ? 'Searching OpenStreetMap across India...'
+                : 'No matching places found. Try typing a street, landmark, town, or city.'}
             </div>
           ) : (
             <div className="divide-y divide-border/30">

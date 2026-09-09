@@ -3,13 +3,13 @@
 import React from 'react';
 import { CITIES } from '@/lib/mockData';
 import { CityOption } from '@/types';
-import { LocateFixed, Activity, Cpu, Loader2 } from 'lucide-react';
+import { LocateFixed, Activity, Cpu, Loader2, Network } from 'lucide-react';
 
 interface NavbarProps {
   selectedCity: CityOption;
   onSelectCity: (city: CityOption) => void;
-  activeTab: 'monitor' | 'under_the_hood';
-  onSelectTab: (tab: 'monitor' | 'under_the_hood') => void;
+  activeTab: 'monitor' | 'sensor_optimization' | 'under_the_hood';
+  onSelectTab: (tab: 'monitor' | 'sensor_optimization' | 'under_the_hood') => void;
   onDetectLocation: () => void;
   isLocating?: boolean;
 }
@@ -39,7 +39,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Center: Top Level Tab Switcher (Consumer Monitor vs Developer Under-the-Hood) */}
+      {/* Center: Top Level Tab Switcher (Live Monitor vs Sensor Optimization vs Under-the-Hood) */}
       <div className="flex items-center bg-surface-raised p-1 rounded-[6px] border border-border text-xs">
         <button
           onClick={() => onSelectTab('monitor')}
@@ -51,6 +51,21 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           <Activity className="w-3.5 h-3.5" />
           <span>Live Monitor</span>
+        </button>
+
+        <button
+          onClick={() => onSelectTab('sensor_optimization')}
+          className={`flex items-center gap-1.5 px-3 py-1 rounded-[4px] font-medium transition-colors ${
+            activeTab === 'sensor_optimization'
+              ? 'bg-surface text-accent border border-border-strong shadow-sm'
+              : 'text-text-muted hover:text-text-primary'
+          }`}
+        >
+          <Network className="w-3.5 h-3.5" />
+          <span>Sensor Optimization</span>
+          <span className="text-[9px] font-semibold tracking-wider uppercase px-1 py-0.2 rounded bg-accent/20 text-accent border border-accent/30 hidden lg:inline">
+            Planner
+          </span>
         </button>
 
         <button
@@ -95,8 +110,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               const city = CITIES.find((c) => c.id === e.target.value);
               if (city) onSelectCity(city);
             }}
-            className="bg-transparent text-text-primary font-medium focus:outline-none cursor-pointer pr-1"
+            className="bg-transparent text-text-primary font-medium focus:outline-none cursor-pointer pr-1 max-w-[160px] truncate"
+            title={selectedCity.name}
           >
+            {!CITIES.some((c) => c.id === selectedCity.id) && (
+              <option value={selectedCity.id} className="bg-surface text-text-primary">
+                📍 {selectedCity.name}
+              </option>
+            )}
             {CITIES.map((c) => (
               <option key={c.id} value={c.id} className="bg-surface text-text-primary">
                 {c.name}

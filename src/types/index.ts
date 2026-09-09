@@ -157,3 +157,45 @@ export interface CityOption {
   zoom: number;
   bounds: [[number, number], [number, number]];
 }
+
+// 5.4 Smart Sensor Network Optimization Contracts
+export interface SensorRecommendation {
+  rank: number;
+  lat: number;
+  lon: number;
+  priority_score: number;
+  predicted_pm25: number;
+  predicted_aqi: number;
+  nearest_station_km: number;
+  nearest_station_name: string;
+  coverage_gap_score: number;
+  pollution_risk_score: number;
+  information_value_score: number;
+  reason_codes: string[];
+  explanation: string;
+}
+
+export interface SensorNetworkSummary {
+  existing_station_count: number;
+  recommended_new_sensors: number;
+  coverage_improvement_pct: number;
+  baseline_mean_nearest_sensor_km: number;
+  optimized_mean_nearest_sensor_km: number;
+  baseline_max_distance_km: number;
+  optimized_max_distance_km: number;
+  baseline_coverage_pct: number;
+  optimized_coverage_pct: number;
+  high_risk_coverage_improvement_pct?: number;
+}
+
+export interface SensorOptimizationResponse {
+  city: string;
+  hour_offset: number;
+  candidate_count: number;
+  recommended_count: number;
+  recommendations: SensorRecommendation[];
+  network_summary: SensorNetworkSummary;
+  is_fallback?: boolean;
+  computation_time_ms?: number;
+}
+

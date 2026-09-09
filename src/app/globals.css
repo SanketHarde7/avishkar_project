@@ -138,8 +138,7 @@ body {
   color: var(--text-secondary) !important;
 }
 
-/* Smooth continuous heatmap transitions */
+/* Heatmap image layer */
 .leaflet-image-layer {
-  transition: opacity 0.35s ease-in-out, filter 0.35s ease-in-out;
   pointer-events: none !important;
 }

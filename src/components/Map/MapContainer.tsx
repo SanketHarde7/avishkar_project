@@ -8,6 +8,7 @@ import { Loader2 } from 'lucide-react';
 interface MapContainerProps {
   center: [number, number];
   zoom: number;
+  bounds?: [[number, number], [number, number]];
   stations: Station[];
   grid: GridPoint[];
   selectedPrediction: PointPrediction | null;

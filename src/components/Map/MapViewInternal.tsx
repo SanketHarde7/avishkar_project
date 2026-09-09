@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, useMapEvents, CircleMarker, useMap, Tooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, useMapEvents, CircleMarker, useMap, Tooltip, ZoomControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Station, GridPoint, PointPrediction } from '@/types';
 import { StationMarkers } from './StationMarkers';
@@ -14,6 +14,7 @@ import { StreetSearchBar } from '../Search/StreetSearchBar';
 interface MapViewInternalProps {
   center: [number, number];
   zoom: number;
+  bounds?: [[number, number], [number, number]];
   stations: Station[];
   grid: GridPoint[];
   selectedPrediction: PointPrediction | null;
@@ -33,9 +34,22 @@ interface MapViewInternalProps {
 // Controller to smoothly update map view when center/zoom changes (e.g. switching cities or locating user)
 const MapViewController: React.FC<{ center: [number, number]; zoom: number }> = ({ center, zoom }) => {
   const map = useMap();
+  const lastTargetRef = React.useRef<{ lat: number; lon: number; zoom: number } | null>(null);
+
   useEffect(() => {
-    map.flyTo(center, zoom, { animate: true, duration: 1.2 });
+    const [targetLat, targetLon] = center;
+    const prev = lastTargetRef.current;
+
+    // Only animate if the center coordinate actually changed from the last requested programmatic target
+    const isNewCoord = !prev || Math.abs(prev.lat - targetLat) > 0.001 || Math.abs(prev.lon - targetLon) > 0.001;
+    const isNewZoom = !prev || prev.zoom !== zoom;
+
+    if (isNewCoord || isNewZoom) {
+      lastTargetRef.current = { lat: targetLat, lon: targetLon, zoom };
+      map.flyTo([targetLat, targetLon], zoom, { animate: true, duration: 1.0 });
+    }
   }, [center, zoom, map]);
+
   return null;
 };
 
@@ -52,6 +66,7 @@ const MapClickHandler: React.FC<{ onSelect: (lat: number, lon: number) => void }
 export const MapViewInternal: React.FC<MapViewInternalProps> = ({
   center,
   zoom,
+  bounds,
   stations,
   grid,
   selectedPrediction,
@@ -71,8 +86,16 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
 
   return (
     <div className="relative w-full h-full bg-background select-none overflow-hidden">
-      {/* Street & Neighborhood Search Bar HUD (Floating Center-Top) */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] w-full max-w-lg px-4 pointer-events-auto">
+      {/* Wind and Advection Vector HUD (Top Left, no collision with zoom buttons) */}
+      <WindOverlay
+        windSpeedKmh={windSpeedKmh}
+        windDirectionDeg={windDirectionDeg}
+        u={u}
+        v={v}
+      />
+
+      {/* Street & Neighborhood Search Bar HUD (Floating Center-Top, bounded away from left/right widgets) */}
+      <div className="absolute top-3 left-[140px] right-[150px] sm:left-[155px] sm:right-[170px] md:left-[170px] md:right-[210px] lg:left-1/2 lg:-translate-x-1/2 lg:w-full lg:max-w-md z-[1000] pointer-events-auto">
         <StreetSearchBar
           onSelectLocation={onSelectStreet || onSelectCoordinates}
           onDetectLocation={onDetectLocation || (() => {})}
@@ -81,36 +104,38 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
       </div>
 
       {/* Layer Mode Switcher HUD (2D Heatmap / 2.5D Columns / Hybrid) */}
-      <div className="absolute top-4 right-4 z-[1000] flex items-center bg-surface/95 backdrop-blur-sm border border-border p-1 rounded-[6px] text-xs pointer-events-auto">
-        <div className="flex items-center gap-1 px-1.5 text-text-muted">
+      <div className="absolute top-3 right-3 z-[1000] flex items-center bg-surface/95 backdrop-blur-md border border-border p-1 rounded-[6px] text-xs pointer-events-auto shadow-md">
+        <div className="hidden lg:flex items-center gap-1 px-1.5 text-text-muted">
           <Layers className="w-3.5 h-3.5 text-text-secondary" />
-          <span className="hidden sm:inline text-[11px] font-medium">Layer:</span>
+          <span className="text-[11px] font-medium">Layer:</span>
         </div>
         <button
           onClick={() => setLayerMode('2d')}
-          className={`px-2.5 py-1 rounded-[4px] font-medium transition-colors ${
+          className={`px-2 py-1 rounded-[4px] font-medium transition-colors text-xs ${
             layerMode === '2d'
               ? 'bg-surface-raised text-accent border border-border-strong'
               : 'text-text-muted hover:text-text-primary'
           }`}
           title="2D Continuous PINN Advection Heatmap"
         >
-          2D Field
+          <span className="hidden sm:inline">2D Field</span>
+          <span className="sm:hidden">2D</span>
         </button>
         <button
           onClick={() => setLayerMode('25d')}
-          className={`px-2.5 py-1 rounded-[4px] font-medium transition-colors ${
+          className={`px-2 py-1 rounded-[4px] font-medium transition-colors text-xs ${
             layerMode === '25d'
               ? 'bg-surface-raised text-accent border border-border-strong'
               : 'text-text-muted hover:text-text-primary'
           }`}
           title="2.5D Extruded Vertical Columns (Height = Pollution)"
         >
-          2.5D Columns
+          <span className="hidden sm:inline">2.5D Columns</span>
+          <span className="sm:hidden">3D</span>
         </button>
         <button
           onClick={() => setLayerMode('both')}
-          className={`px-2.5 py-1 rounded-[4px] font-medium transition-colors ${
+          className={`px-2 py-1 rounded-[4px] font-medium transition-colors text-xs ${
             layerMode === 'both'
               ? 'bg-surface-raised text-accent border border-border-strong'
               : 'text-text-muted hover:text-text-primary'
@@ -120,14 +145,6 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
           Hybrid
         </button>
       </div>
-
-      {/* Wind and Advection Vector HUD */}
-      <WindOverlay
-        windSpeedKmh={windSpeedKmh}
-        windDirectionDeg={windDirectionDeg}
-        u={u}
-        v={v}
-      />
 
       {/* Map Legend Overlay matching continuous color ramp */}
       <div className="absolute bottom-4 left-4 z-[1000] bg-surface/95 backdrop-blur-sm border border-border text-text-primary p-3 rounded-[2px] text-xs space-y-1.5 pointer-events-auto">
@@ -166,10 +183,12 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
       <MapContainer
         center={center}
         zoom={zoom}
+        zoomControl={false}
         scrollWheelZoom={true}
         className="w-full h-full z-0"
         style={{ background: '#f2efe9' }}
       >
+        <ZoomControl position="bottomright" />
         <MapViewController center={center} zoom={zoom} />
         <MapClickHandler onSelect={onSelectCoordinates} />
 
@@ -182,7 +201,7 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
         />
 
         {/* Smooth Continuous PINN Gradient Image Overlay */}
-        {(layerMode === '2d' || layerMode === 'both') && <HeatmapLayer grid={grid} />}
+        {(layerMode === '2d' || layerMode === 'both') && <HeatmapLayer grid={grid} bounds={bounds} />}
 
         {/* 2D Flat CPCB Ground Truth Station Markers */}
         {layerMode === '2d' && (
