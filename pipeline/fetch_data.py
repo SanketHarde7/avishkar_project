@@ -59,6 +59,8 @@ class StationRecord(BaseModel):
     aqi: int
     status: str = Field(description="'active' or 'hidden_for_validation'")
     data_source: str = Field(default="live", description="'live' or 'fallback'")
+    pm25_sensor_id: Optional[int] = Field(default=None, description="OpenAQ v3 PM2.5 sensor ID")
+    latest_dt: Optional[str] = Field(default=None, description="ISO timestamp of latest reading")
 
 class WeatherVectorPoint(BaseModel):
     timestamp: str
@@ -73,66 +75,66 @@ class WeatherVectorPoint(BaseModel):
 # Curated Pune Ground Sensors (Offline Fallback Guarantee)
 # ---------------------------------------------------------
 PUNE_FALLBACK_STATIONS: List[Dict[str, Any]] = [
-  {
-    "station_id": "PUN_SHIVAJINAGAR",
-    "name": "Shivajinagar, Pune",
-    "lat": 18.5314,
-    "lon": 73.8446,
-    "pm25": 94.2,
-    "aqi": 172,
-    "status": "active",
-    "data_source": "fallback",
-  },
-  {
-    "station_id": "PUN_HADAPSAR",
-    "name": "Hadapsar, Pune",
-    "lat": 18.5089,
-    "lon": 73.9260,
-    "pm25": 108.5,
-    "aqi": 185,
-    "status": "active",
-    "data_source": "fallback",
-  },
-  {
-    "station_id": "PUN_KATRAJ",
-    "name": "Katraj, Pune",
-    "lat": 18.4575,
-    "lon": 73.8677,
-    "pm25": 68.4,
-    "aqi": 124,
-    "status": "active",
-    "data_source": "fallback",
-  },
-  {
-    "station_id": "PUN_KOTHRUD",
-    "name": "Kothrud, Pune",
-    "lat": 18.5074,
-    "lon": 73.8077,
-    "pm25": 45.1,
-    "aqi": 88,
-    "status": "active",
-    "data_source": "fallback",
-  },
-  {
-    "station_id": "PUN_PASHAN",
-    "name": "Pashan, Pune",
-    "lat": 18.5410,
-    "lon": 73.7928,
-    "pm25": 38.0,
-    "aqi": 76,
-    "status": "hidden_for_validation",
-    "data_source": "fallback",
-  },
-  {
-    "station_id": "PUN_BHOSARI",
-    "name": "Bhosari Industrial Area, Pune",
-    "lat": 18.6247,
-    "lon": 73.8488,
-    "pm25": 114.7,
-    "aqi": 192,
-    "status": "hidden_for_validation",
-    "data_source": "fallback",
-  },
+    {
+        "station_id": "PUN_SHIVAJINAGAR",
+        "name": "Shivajinagar, Pune",
+        "lat": 18.5314,
+        "lon": 73.8446,
+        "pm25": 94.2,
+        "aqi": 172,
+        "status": "active",
+        "data_source": "fallback",
+    },
+    {
+        "station_id": "PUN_HADAPSAR",
+        "name": "Hadapsar, Pune",
+        "lat": 18.5089,
+        "lon": 73.9260,
+        "pm25": 108.5,
+        "aqi": 185,
+        "status": "active",
+        "data_source": "fallback",
+    },
+    {
+        "station_id": "PUN_KATRAJ",
+        "name": "Katraj, Pune",
+        "lat": 18.4575,
+        "lon": 73.8677,
+        "pm25": 68.4,
+        "aqi": 124,
+        "status": "active",
+        "data_source": "fallback",
+    },
+    {
+        "station_id": "PUN_KOTHRUD",
+        "name": "Kothrud, Pune",
+        "lat": 18.5074,
+        "lon": 73.8077,
+        "pm25": 45.1,
+        "aqi": 88,
+        "status": "active",
+        "data_source": "fallback",
+    },
+    {
+        "station_id": "PUN_PASHAN",
+        "name": "Pashan, Pune",
+        "lat": 18.5410,
+        "lon": 73.7928,
+        "pm25": 38.0,
+        "aqi": 76,
+        "status": "hidden_for_validation",
+        "data_source": "fallback",
+    },
+    {
+        "station_id": "PUN_BHOSARI",
+        "name": "Bhosari Industrial Area, Pune",
+        "lat": 18.6247,
+        "lon": 73.8488,
+        "pm25": 114.7,
+        "aqi": 192,
+        "status": "hidden_for_validation",
+        "data_source": "fallback",
+    },
 ]
 
 
@@ -159,12 +161,10 @@ def fetch_openaq_stations() -> List[StationRecord]:
     """
     Query OpenAQ v3 API for monitoring stations in Pune within target bounding box.
     Authenticates with OPENAQ_API_KEY from .env via 'X-API-Key' header.
-    Inspects locations and queries latest sensor measurements per station.
-    Logs loud, explicit errors if API calls fail, and marks data_source as 'live' vs 'fallback'.
+    Inspects locations, identifies active PM2.5 sensor IDs, and queries latest sensor measurements.
     """
     logger.info("Connecting to OpenAQ API v3 for Pune monitoring stations...")
 
-    # 1. Load API key from .env using python-dotenv
     load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
     load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
     load_dotenv(find_dotenv())
@@ -183,7 +183,6 @@ def fetch_openaq_stations() -> List[StationRecord]:
         "X-API-Key": api_key,
         "Accept": "application/json",
     }
-    # OpenAQ v3 bbox parameter format: min_lon,min_lat,max_lon,max_lat
     params = {
         "bbox": f"{PUNE_BBOX['lon_min']},{PUNE_BBOX['lat_min']},{PUNE_BBOX['lon_max']},{PUNE_BBOX['lat_max']}",
         "limit": 100,
@@ -232,6 +231,7 @@ def fetch_openaq_stations() -> List[StationRecord]:
 
                 pm25_val: Optional[float] = None
                 reading_dt: str = ""
+                active_sensor_id: Optional[int] = None
 
                 # Query latest measurements for this location
                 if loc_id is not None and pm25_sensor_ids:
@@ -252,6 +252,7 @@ def fetch_openaq_stations() -> List[StationRecord]:
                                 )
                                 pm25_val = float(readings[0]["value"])
                                 reading_dt = (readings[0].get("datetime") or {}).get("utc", "")
+                                active_sensor_id = readings[0].get("sensorsId")
                         else:
                             logger.error(
                                 f"[ERROR] [OPENAQ API ERROR] Failed to fetch latest readings for location {loc_id} ('{name}'): "
@@ -261,6 +262,10 @@ def fetch_openaq_stations() -> List[StationRecord]:
                         logger.error(
                             f"[ERROR] [NETWORK ERROR] Exception querying latest readings for location {loc_id} ('{name}'): {exc}"
                         )
+
+                # Fallback sensor ID if not determined from latest endpoint
+                if not active_sensor_id and pm25_sensor_ids:
+                    active_sensor_id = max(pm25_sensor_ids)
 
                 # Fallback to safe physical default if station has no current reading
                 if pm25_val is None or pm25_val <= 0:
@@ -274,7 +279,7 @@ def fetch_openaq_stations() -> List[StationRecord]:
                 if coord_key in seen_stations:
                     existing = seen_stations[coord_key]
                     if reading_dt <= existing.get("dt", ""):
-                        continue  # existing is newer or same
+                        continue
 
                 seen_stations[coord_key] = {
                     "station_id": station_id,
@@ -283,6 +288,7 @@ def fetch_openaq_stations() -> List[StationRecord]:
                     "lon": round(lon, 4),
                     "pm25": round(float(pm25_val), 1),
                     "dt": reading_dt,
+                    "pm25_sensor_id": active_sensor_id,
                 }
 
             for s_info in seen_stations.values():
@@ -301,11 +307,14 @@ def fetch_openaq_stations() -> List[StationRecord]:
                     aqi=aqi,
                     status=status,
                     data_source="live",
+                    pm25_sensor_id=s_info.get("pm25_sensor_id"),
+                    latest_dt=s_info.get("dt"),
                 )
                 stations.append(st_record)
                 logger.info(
                     f"  [OK] [LIVE] Station {st_record.station_id}: {name} (lat={st_record.lat}, lon={st_record.lon}) -> "
-                    f"PM2.5: {st_record.pm25} ug/m3, AQI: {st_record.aqi}, Status: {st_record.status}"
+                    f"PM2.5: {st_record.pm25} ug/m3, AQI: {st_record.aqi}, Status: {st_record.status}, "
+                    f"PM2.5 Sensor ID: {st_record.pm25_sensor_id}"
                 )
 
     except Exception as exc:
@@ -325,11 +334,123 @@ def fetch_openaq_stations() -> List[StationRecord]:
 
 
 # ---------------------------------------------------------
-# Step 2: Open-Meteo Weather Vector Fetcher
+# Step 2: OpenAQ v3 Real Historical Measurements Fetcher
 # ---------------------------------------------------------
-def fetch_hourly_weather(lat: float, lon: float, past_days: int = 3) -> pd.DataFrame:
+def fetch_sensor_historical_measurements(
+    sensor_id: int,
+    session: requests.Session,
+    dt_from: datetime,
+    dt_to: datetime,
+) -> pd.DataFrame:
+    """
+    Fetch real historical PM2.5 measurements from OpenAQ v3 sensor measurements endpoint:
+    https://api.openaq.org/v3/sensors/{sensor_id}/measurements
+    Uses hourly rollup endpoint (/measurements/hourly) with fallback to raw (/measurements).
+    Returns DataFrame with columns ['timestamp', 'pm25'] in local time (Asia/Kolkata).
+    """
+    from_utc_str = dt_from.strftime("%Y-%m-%dT%H:%M:%SZ")
+    to_utc_str = dt_to.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    params = {
+        "datetime_from": from_utc_str,
+        "datetime_to": to_utc_str,
+        "date_from": from_utc_str,
+        "date_to": to_utc_str,
+        "limit": 1000,
+    }
+
+    # 1. Query OpenAQ v3 hourly measurements endpoint
+    hourly_url = f"https://api.openaq.org/v3/sensors/{sensor_id}/measurements/hourly"
+    try:
+        resp = session.get(hourly_url, params=params, timeout=12)
+        if resp.status_code == 200:
+            results = resp.json().get("results", [])
+            if results:
+                rows = []
+                for item in results:
+                    val = item.get("value")
+                    if val is None:
+                        continue
+                    period = item.get("period", {})
+                    dt_info = period.get("datetimeTo") or period.get("datetimeFrom") or {}
+                    dt_local = dt_info.get("local")
+                    if dt_local:
+                        try:
+                            ts = datetime.fromisoformat(dt_local).strftime("%Y-%m-%dT%H:00")
+                        except Exception:
+                            ts = dt_local[:16]
+                    elif dt_info.get("utc"):
+                        try:
+                            dt_utc = datetime.fromisoformat(dt_info["utc"].replace("Z", "+00:00"))
+                            dt_ist = dt_utc + timedelta(hours=5, minutes=30)
+                            ts = dt_ist.strftime("%Y-%m-%dT%H:00")
+                        except Exception:
+                            ts = dt_info["utc"][:16]
+                    else:
+                        continue
+
+                    rows.append({"timestamp": ts, "pm25": round(float(val), 1)})
+
+                if rows:
+                    df = pd.DataFrame(rows).drop_duplicates(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
+                    return df
+    except Exception as exc:
+        logger.warning(f"Hourly rollup query failed for sensor {sensor_id}: {exc}. Trying raw endpoint.")
+
+    # 2. Fallback to OpenAQ v3 raw measurements endpoint: https://api.openaq.org/v3/sensors/{sensor_id}/measurements
+    meas_url = f"https://api.openaq.org/v3/sensors/{sensor_id}/measurements"
+    try:
+        resp = session.get(meas_url, params=params, timeout=12)
+        if resp.status_code == 200:
+            results = resp.json().get("results", [])
+            rows = []
+            for item in results:
+                val = item.get("value")
+                if val is None:
+                    continue
+                period = item.get("period", {})
+                dt_info = period.get("datetimeTo") or period.get("datetimeFrom") or {}
+                dt_local = dt_info.get("local")
+                if dt_local:
+                    try:
+                        ts = datetime.fromisoformat(dt_local).strftime("%Y-%m-%dT%H:00")
+                    except Exception:
+                        ts = dt_local[:16]
+                elif dt_info.get("utc"):
+                    try:
+                        dt_utc = datetime.fromisoformat(dt_info["utc"].replace("Z", "+00:00"))
+                        dt_ist = dt_utc + timedelta(hours=5, minutes=30)
+                        ts = dt_ist.strftime("%Y-%m-%dT%H:00")
+                    except Exception:
+                        ts = dt_info["utc"][:16]
+                else:
+                    continue
+
+                rows.append({"timestamp": ts, "pm25": float(val)})
+
+            if rows:
+                raw_df = pd.DataFrame(rows)
+                hourly_df = raw_df.groupby("timestamp")["pm25"].mean().round(1).reset_index().sort_values("timestamp").reset_index(drop=True)
+                return hourly_df
+    except Exception as exc:
+        logger.error(f"Raw measurements query failed for sensor {sensor_id}: {exc}")
+
+    return pd.DataFrame(columns=["timestamp", "pm25"])
+
+
+# ---------------------------------------------------------
+# Step 3: Open-Meteo Weather Vector Fetcher
+# ---------------------------------------------------------
+def fetch_hourly_weather(
+    lat: float,
+    lon: float,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    past_days: int = 3,
+) -> pd.DataFrame:
     """
     Fetch hourly atmospheric weather for coordinates via 100% free Open-Meteo API.
+    Supports specific start_date and end_date (YYYY-MM-DD) or past_days window.
     Computes vector flow components:
       u = -wind_speed * sin(radians(wind_direction))
       v = -wind_speed * cos(radians(wind_direction))
@@ -339,10 +460,14 @@ def fetch_hourly_weather(lat: float, lon: float, past_days: int = 3) -> pd.DataF
         "latitude": lat,
         "longitude": lon,
         "hourly": "temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m",
-        "past_days": past_days,
-        "forecast_days": 1,
         "timezone": "Asia/Kolkata",
     }
+    if start_date and end_date:
+        params["start_date"] = start_date
+        params["end_date"] = end_date
+    else:
+        params["past_days"] = past_days
+        params["forecast_days"] = 1
 
     try:
         resp = requests.get(url, params=params, timeout=12)
@@ -402,7 +527,53 @@ def fetch_hourly_weather(lat: float, lon: float, past_days: int = 3) -> pd.DataF
 
 
 # ---------------------------------------------------------
-# Step 3: Spatiotemporal Alignment & Dataset Export
+# Step 3b: Open-Meteo Satellite/Model-Informed Atmospheric Air Quality (CAMS)
+# ---------------------------------------------------------
+def fetch_cams_air_quality(
+    lat: float,
+    lon: float,
+    start_date: str,
+    end_date: str,
+) -> pd.DataFrame:
+    """
+    Fetch satellite/model-informed atmospheric background (CAMS/Open-Meteo) for PM2.5 and NO2.
+    Endpoint: https://air-quality-api.open-meteo.com/v1/air-quality
+    Returns DataFrame with columns ['timestamp', 'cams_pm25_bg', 'cams_no2_bg'].
+    """
+    url = "https://air-quality-api.open-meteo.com/v1/air-quality"
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "hourly": "pm2_5,nitrogen_dioxide",
+        "start_date": start_date,
+        "end_date": end_date,
+        "timezone": "Asia/Kolkata",
+    }
+    try:
+        resp = requests.get(url, params=params, timeout=12)
+        if resp.status_code == 200:
+            hourly = resp.json().get("hourly", {})
+            times = hourly.get("time", [])
+            pm25_bg = hourly.get("pm2_5", [])
+            no2_bg = hourly.get("nitrogen_dioxide", [])
+            df = pd.DataFrame({
+                "timestamp": times,
+                "cams_pm25_bg": pm25_bg,
+                "cams_no2_bg": no2_bg,
+            })
+            return df
+        else:
+            logger.warning(
+                f"Air Quality API returned HTTP {resp.status_code} for ({lat}, {lon}): {resp.text}"
+            )
+    except Exception as exc:
+        logger.warning(f"Air Quality API fetch failed for ({lat}, {lon}): {exc}")
+
+    return pd.DataFrame(columns=["timestamp", "cams_pm25_bg", "cams_no2_bg"])
+
+
+# ---------------------------------------------------------
+# Step 4: Spatiotemporal Alignment & Dataset Export
 # ---------------------------------------------------------
 def run_pipeline():
     logger.info("Starting Air Pollution Detector Data Pipeline...")
@@ -412,28 +583,116 @@ def run_pipeline():
     stations = fetch_openaq_stations()
 
     # Export live stations JSON contract (Section 5.1)
-    stations_data = [st.model_dump() for st in stations]
+    stations_data = [
+        {k: v for k, v in st.model_dump().items() if k not in ("pm25_sensor_id", "latest_dt")}
+        for st in stations
+    ]
     with open(STATIONS_JSON_PATH, "w", encoding="utf-8") as f:
         json.dump(stations_data, f, indent=2)
     logger.info(f"Exported live stations JSON contract -> {STATIONS_JSON_PATH}")
 
-    # 2. Extract multi-day meteorological vectors for each station
-    all_records = []
+    # 2. Determine the 72-hour historical window ending at latest available sensor telemetry
+    valid_dts = []
     for st in stations:
-        logger.info(f"Fetching 72h atmospheric vectors for {st.name} ({st.lat}, {st.lon})...")
-        weather_df = fetch_hourly_weather(st.lat, st.lon, past_days=3)
+        if st.latest_dt:
+            try:
+                dt = datetime.fromisoformat(st.latest_dt.replace("Z", "+00:00"))
+                if dt.year >= 2026:
+                    valid_dts.append(dt)
+            except Exception:
+                pass
 
-        # Baseline diurnal pollution oscillation
-        base_pm25 = st.pm25
-        for idx, row in weather_df.iterrows():
-            hour = idx % 24
-            # Morning peak traffic inversion (8-10am) & evening peak (7-9pm)
-            traffic_factor = 1.0 + 0.35 * math.exp(-((hour - 9) ** 2) / 4) + 0.4 * math.exp(-((hour - 20) ** 2) / 6)
-            # Stronger wind lowers localized stagnation
-            wind_dispersion = 1.0 - (row["wind_speed_10m"] / 45.0)
-            pm25_val = round(max(15.0, base_pm25 * traffic_factor * wind_dispersion), 1)
+    if valid_dts:
+        t_end = max(valid_dts)
+    else:
+        t_end = datetime.now(timezone.utc)
+
+    HISTORICAL_HOURS = 336  # 14 days
+    t_start = t_end - timedelta(hours=HISTORICAL_HOURS)
+    logger.info(f"Historical 14-day ({HISTORICAL_HOURS}-hour) measurement window: {t_start.isoformat()} to {t_end.isoformat()}")
+
+    # Setup OpenAQ API session
+    load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
+    load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
+    load_dotenv(find_dotenv())
+    api_key = os.getenv("OPENAQ_API_KEY")
+
+    session = requests.Session()
+    if api_key:
+        session.headers.update({
+            "X-API-Key": api_key,
+            "Accept": "application/json",
+        })
+
+    # 3. Extract real historical PM2.5 measurements and join with atmospheric weather
+    all_records = []
+    low_coverage_stations = []
+    MIN_POINTS_THRESHOLD = 150  # Proportionally scaled for 14-day window (at least 150 real points out of 336 possible)
+
+    logger.info("Fetching real historical PM2.5 measurements per station sensor (OpenAQ v3)...")
+
+    for st in stations:
+        sensor_id = st.pm25_sensor_id
+        if not sensor_id or not api_key:
+            logger.warning(
+                f"[LOW COVERAGE WARNING] Station '{st.name}' (ID: {st.station_id}) has no associated "
+                f"OpenAQ PM2.5 sensor ID. 0 real historical points in 14-day window (< threshold {MIN_POINTS_THRESHOLD}). "
+                f"Excluding station from training dataset."
+            )
+            low_coverage_stations.append((st.name, 0))
+            continue
+
+        meas_df = fetch_sensor_historical_measurements(
+            sensor_id=sensor_id,
+            session=session,
+            dt_from=t_start,
+            dt_to=t_end,
+        )
+
+        num_points = len(meas_df)
+        if num_points < MIN_POINTS_THRESHOLD:
+            logger.warning(
+                f"[LOW COVERAGE WARNING] Station '{st.name}' (ID: {st.station_id}, sensor: {sensor_id}) "
+                f"returned only {num_points} real historical points in 14-day window (< threshold {MIN_POINTS_THRESHOLD}). "
+                f"Excluding station row-gaps from training dataset rather than inventing fake data."
+            )
+            low_coverage_stations.append((st.name, num_points))
+            continue
+
+        unique_vals = meas_df["pm25"].nunique()
+        logger.info(
+            f"Station '{st.name}' (sensor {sensor_id}): {num_points} real historical measurements "
+            f"(PM2.5 unique: {unique_vals}, range: [{meas_df['pm25'].min()}, {meas_df['pm25'].max()}])."
+        )
+
+        # Fetch matching hourly weather from Open-Meteo for exact timestamp range
+        start_d = meas_df["timestamp"].min()[:10]
+        end_d = meas_df["timestamp"].max()[:10]
+        weather_df = fetch_hourly_weather(st.lat, st.lon, start_date=start_d, end_date=end_d)
+        cams_df = fetch_cams_air_quality(st.lat, st.lon, start_date=start_d, end_date=end_d)
+
+        # Merge on exact timestamp
+        merged = pd.merge(meas_df, weather_df, on="timestamp", how="inner")
+        if not cams_df.empty:
+            merged = pd.merge(merged, cams_df, on="timestamp", how="left")
+        else:
+            logger.warning(
+                f"[WARNING] Missing CAMS background air quality data for station '{st.name}'. "
+                "Setting cams_pm25_bg and cams_no2_bg to NaN (no fabrication)."
+            )
+            merged["cams_pm25_bg"] = None
+            merged["cams_no2_bg"] = None
+
+        # Check for any missing values in CAMS background
+        cams_missing = merged[["cams_pm25_bg", "cams_no2_bg"]].isna().sum().sum()
+        if cams_missing > 0:
+            logger.warning(
+                f"[WARNING] Station '{st.name}' has {cams_missing} missing CAMS background values in merged timeline."
+            )
+
+        for _, row in merged.iterrows():
+            pm25_val = float(row["pm25"])
             aqi_val = calculate_aqi_from_pm25(pm25_val)
-
             all_records.append({
                 "timestamp": row["timestamp"],
                 "station_id": st.station_id,
@@ -448,14 +707,32 @@ def run_pipeline():
                 "wind_direction_10m": row["wind_direction_10m"],
                 "u_wind": row["u_wind"],
                 "v_wind": row["v_wind"],
+                "cams_pm25_bg": float(row["cams_pm25_bg"]) if pd.notna(row.get("cams_pm25_bg")) else None,
+                "cams_no2_bg": float(row["cams_no2_bg"]) if pd.notna(row.get("cams_no2_bg")) else None,
                 "status": st.status,
             })
+
+    # Summary of low-coverage stations
+    if low_coverage_stations:
+        logger.warning(
+            f"Low-coverage station summary (< {MIN_POINTS_THRESHOLD} real points, excluded from training):"
+        )
+        for name, cnt in low_coverage_stations:
+            logger.warning(f"  - '{name}': {cnt} real points")
 
     # Convert to DataFrame
     df = pd.DataFrame(all_records)
 
-    # Clean nulls using forward-fill & backward-fill
-    df = df.ffill().bfill()
+    # Check for NaNs
+    nan_count = df.isna().sum().sum()
+    if nan_count > 0:
+        missing_cols = df.columns[df.isna().any()].tolist()
+        logger.warning(
+            f"[DATA INTEGRITY WARNING] Dataset contains {nan_count} missing/NaN values across columns: {missing_cols}. "
+            "Logging warning as requested (no fabricated values)."
+        )
+        # Drop rows with NaNs if any so training matrices are clean
+        df = df.dropna().reset_index(drop=True)
 
     # Save to CSV
     df.to_csv(TRAINING_CSV_PATH, index=False)

@@ -1,0 +1,143 @@
+{
+  "evaluation_type": "Leave-One-Out Cross-Validation (12 Folds)",
+  "epochs_per_fold": 100,
+  "folds": [
+    {
+      "station": "Bhosari, Pune - IITM",
+      "n_samples": 274,
+      "gm_mae": 4.12,
+      "gm_r2": -0.004,
+      "xgb_mae": 4.7,
+      "xgb_r2": -0.28,
+      "pinn_mae": 4.06,
+      "pinn_r2": 0.001
+    },
+    {
+      "station": "Dhankawadi, Pune - IITM",
+      "n_samples": 265,
+      "gm_mae": 5.51,
+      "gm_r2": -0.257,
+      "xgb_mae": 4.31,
+      "xgb_r2": 0.214,
+      "pinn_mae": 4.99,
+      "pinn_r2": 0.03
+    },
+    {
+      "station": "Gavalinagar, Pimpri Chinchwad - MPCB",
+      "n_samples": 275,
+      "gm_mae": 3.36,
+      "gm_r2": -0.041,
+      "xgb_mae": 3.33,
+      "xgb_r2": 0.011,
+      "pinn_mae": 3.15,
+      "pinn_r2": 0.092
+    },
+    {
+      "station": "Hadapsar, Pune - IITM",
+      "n_samples": 267,
+      "gm_mae": 9.3,
+      "gm_r2": -0.837,
+      "xgb_mae": 9.98,
+      "xgb_r2": -0.935,
+      "pinn_mae": 7.01,
+      "pinn_r2": -0.089
+    },
+    {
+      "station": "Katraj Dairy, Pune - MPCB",
+      "n_samples": 241,
+      "gm_mae": 3.98,
+      "gm_r2": -0.195,
+      "xgb_mae": 3.57,
+      "xgb_r2": -0.037,
+      "pinn_mae": 3.83,
+      "pinn_r2": -0.221
+    },
+    {
+      "station": "Mhada Colony, Pune - IITM",
+      "n_samples": 248,
+      "gm_mae": 5.96,
+      "gm_r2": -0.525,
+      "xgb_mae": 4.59,
+      "xgb_r2": 0.204,
+      "pinn_mae": 4.24,
+      "pinn_r2": 0.319
+    },
+    {
+      "station": "Panchawati_Pashan, Pune - IITM",
+      "n_samples": 280,
+      "gm_mae": 3.8,
+      "gm_r2": -0.063,
+      "xgb_mae": 4.27,
+      "xgb_r2": -0.248,
+      "pinn_mae": 4.5,
+      "pinn_r2": -0.391
+    },
+    {
+      "station": "Park Street Wakad, Pimpri Chinchwad - MPCB",
+      "n_samples": 253,
+      "gm_mae": 3.48,
+      "gm_r2": -0.008,
+      "xgb_mae": 8.61,
+      "xgb_r2": -3.049,
+      "pinn_mae": 5.17,
+      "pinn_r2": -0.993
+    },
+    {
+      "station": "Revenue Colony-Shivajinagar, Pune - IITM",
+      "n_samples": 249,
+      "gm_mae": 4.61,
+      "gm_r2": -0.006,
+      "xgb_mae": 4.15,
+      "xgb_r2": 0.171,
+      "pinn_mae": 4.01,
+      "pinn_r2": 0.272
+    },
+    {
+      "station": "Savitribai Phule Pune University, Pune - MPCB",
+      "n_samples": 157,
+      "gm_mae": 8.15,
+      "gm_r2": -8.459,
+      "xgb_mae": 7.43,
+      "xgb_r2": -7.177,
+      "pinn_mae": 6.6,
+      "pinn_r2": -5.736
+    },
+    {
+      "station": "Savta Mali Nagar, Pimpri-Chinchwad - IITM",
+      "n_samples": 278,
+      "gm_mae": 5.43,
+      "gm_r2": -0.097,
+      "xgb_mae": 6.55,
+      "xgb_r2": -0.696,
+      "pinn_mae": 4.65,
+      "pinn_r2": 0.109
+    },
+    {
+      "station": "Thergaon, Pimpri Chinchwad - MPCB",
+      "n_samples": 241,
+      "gm_mae": 11.51,
+      "gm_r2": -0.092,
+      "xgb_mae": 11.3,
+      "xgb_r2": -0.125,
+      "pinn_mae": 10.61,
+      "pinn_r2": -0.012
+    }
+  ],
+  "average_metrics": [
+    {
+      "model": "Global Mean Baseline",
+      "mae": 5.77,
+      "r2": -0.882
+    },
+    {
+      "model": "Spatial XGBoost",
+      "mae": 6.07,
+      "r2": -0.996
+    },
+    {
+      "model": "PINN (Ours)",
+      "mae": 5.24,
+      "r2": -0.552
+    }
+  ]
+}

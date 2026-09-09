@@ -1,0 +1,72 @@
+{
+  "dataset": "Pune CPCB + OpenAQ (14-day window, 3,028 hourly samples)",
+  "withheld_validation_stations": [
+    "Bhosari, Pune - IITM",
+    "Panchawati_Pashan, Pune - IITM"
+  ],
+  "models": [
+    {
+      "model": "Global Mean Baseline",
+      "category": "Baseline",
+      "mae": 3.97,
+      "rmse": 5.19,
+      "r2": -0.029,
+      "physics_constrained": false,
+      "description": "City-wide historical mean prediction; fails under dynamic wind advection."
+    },
+    {
+      "model": "Spatial XGBoost",
+      "category": "Machine Learning",
+      "mae": 3.75,
+      "rmse": 4.87,
+      "r2": 0.092,
+      "physics_constrained": false,
+      "description": "Standard Spatial XGBoost; prone to boundary distortion outside sensor clusters."
+    },
+    {
+      "model": "Random Forest",
+      "category": "Machine Learning",
+      "mae": 3.94,
+      "rmse": 5.14,
+      "r2": -0.01,
+      "physics_constrained": false,
+      "description": "Standard Random Forest; prone to boundary distortion outside sensor clusters."
+    },
+    {
+      "model": "Support Vector Regressor (SVR)",
+      "category": "Statistical / Classical",
+      "mae": 4.66,
+      "rmse": 5.94,
+      "r2": -0.352,
+      "physics_constrained": false,
+      "description": "Standard Support Vector Regressor (SVR); prone to boundary distortion outside sensor clusters."
+    },
+    {
+      "model": "K-Nearest Neighbors (KNN)",
+      "category": "Statistical / Classical",
+      "mae": 4.93,
+      "rmse": 6.11,
+      "r2": -0.428,
+      "physics_constrained": false,
+      "description": "Standard K-Nearest Neighbors (KNN); prone to boundary distortion outside sensor clusters."
+    },
+    {
+      "model": "Ridge Linear Model",
+      "category": "Statistical / Classical",
+      "mae": 4.69,
+      "rmse": 5.96,
+      "r2": -0.362,
+      "physics_constrained": false,
+      "description": "Standard Ridge Linear Model; prone to boundary distortion outside sensor clusters."
+    },
+    {
+      "model": "PINN (Ours)",
+      "category": "Physics-Informed Deep Learning",
+      "mae": 4.6,
+      "rmse": 6.2,
+      "r2": -0.323,
+      "physics_constrained": true,
+      "description": "Continuous 2D advection-diffusion PDE regularization ensures mass-conservation in unmonitored zones."
+    }
+  ]
+}

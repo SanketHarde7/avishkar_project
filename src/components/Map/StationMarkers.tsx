@@ -25,15 +25,15 @@ export const StationMarkers: React.FC<StationMarkersProps> = ({
         // Highlight withheld validation stations with dashed border in Judge Mode
         const markerOptions = isHiddenValidation && isJudgeMode
           ? {
-              color: '#e5e5e5',
-              weight: 2.5,
+              color: '#eef0f2',
+              weight: 2,
               dashArray: '4, 3',
-              fillColor: '#a3a3a3',
+              fillColor: '#6b6f77',
               fillOpacity: 0.95,
-              radius: 10,
+              radius: 9,
             }
           : {
-              color: '#0a0a0a',
+              color: '#121316',
               weight: 1.5,
               fillColor: aqiColor,
               fillOpacity: 0.9,
@@ -50,52 +50,52 @@ export const StationMarkers: React.FC<StationMarkersProps> = ({
             }}
           >
             <Tooltip direction="top" offset={[0, -8]} opacity={0.95}>
-              <div className="bg-neutral-900 text-neutral-200 px-2.5 py-1.5 rounded-md text-xs shadow-lg border border-neutral-700">
+              <div className="bg-surface text-text-primary px-2.5 py-1.5 rounded-[2px] text-xs border border-border">
                 <div className="font-semibold flex items-center gap-1.5">
                   <span>{st.name}</span>
                   {isHiddenValidation && isJudgeMode && (
-                    <span className="text-neutral-400 text-[10px] px-1.5 py-0.5 rounded border border-neutral-600">
+                    <span className="text-text-secondary text-[10px] px-1.5 py-0.5 rounded-[2px] border border-border-strong bg-surface-raised">
                       Holdout
                     </span>
                   )}
                 </div>
-                <div className="text-[11px] text-neutral-400 mt-0.5 tnum">
-                  AQI <span className="font-semibold text-neutral-100">{st.aqi}</span> · PM2.5{' '}
-                  <span className="font-semibold text-neutral-100">{st.pm25} µg/m³</span>
+                <div className="text-[11px] text-text-muted mt-0.5 tnum">
+                  AQI <span className="font-semibold text-text-primary">{st.aqi}</span> · PM2.5{' '}
+                  <span className="font-semibold text-text-primary">{st.pm25} µg/m³</span>
                 </div>
               </div>
             </Tooltip>
 
             <Popup className="custom-leaflet-popup">
-              <div className="p-1 min-w-[200px] text-neutral-900 font-sans">
-                <div className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
-                  CPCB Ground Station
+              <div className="p-1 min-w-[200px] text-text-primary font-sans">
+                <div className="text-[10px] font-medium text-text-muted">
+                  CPCB ground station
                 </div>
-                <div className="text-sm font-bold text-neutral-900 mt-0.5">{st.name}</div>
+                <div className="text-sm font-bold text-text-primary mt-0.5">{st.name}</div>
 
                 {isHiddenValidation && isJudgeMode && (
-                  <div className="my-2 p-1.5 bg-neutral-100 rounded border border-neutral-200 text-xs text-neutral-700 font-medium">
+                  <div className="my-2 p-1.5 bg-surface-raised rounded-[2px] border border-border text-xs text-text-secondary font-medium">
                     <strong>Validation sensor:</strong> withheld during training to independently
                     measure generalization accuracy.
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-neutral-200 text-xs">
+                <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-border text-xs">
                   <div>
-                    <div className="text-neutral-500">Recorded AQI</div>
+                    <div className="text-text-muted">Recorded AQI</div>
                     <div className="text-base font-bold tnum" style={{ color: aqiColor }}>
                       {st.aqi}
                     </div>
                   </div>
                   <div>
-                    <div className="text-neutral-500">PM2.5</div>
-                    <div className="text-base font-bold text-neutral-800 tnum">{st.pm25} µg/m³</div>
+                    <div className="text-text-muted">PM2.5</div>
+                    <div className="text-base font-bold text-text-primary tnum">{st.pm25} µg/m³</div>
                   </div>
                 </div>
 
-                <div className="mt-2 text-[11px] text-neutral-500 flex justify-between">
+                <div className="mt-2 text-[11px] text-text-muted flex justify-between">
                   <span>Status</span>
-                  <span className="font-semibold capitalize text-neutral-700">
+                  <span className="font-semibold capitalize text-text-secondary">
                     {isHiddenValidation ? 'Evaluation holdout' : 'Active'}
                   </span>
                 </div>

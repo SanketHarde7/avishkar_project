@@ -38,11 +38,20 @@ export interface PointPrediction {
   lon: number;
   predicted_pm25: number;
   predicted_aqi: number;
+  pinn_base_pm25?: number;
+  sensor_bias_pct?: number;
+  physics_bias_pct?: number;
+  dominant_sensor_name?: string;
+  dominant_sensor_distance_km?: number;
+  assimilation_summary?: string;
+  street_name?: string;
   nearest_station_km: number;
   nearest_station_name?: string;
   weather: WeatherMetrics;
   physics_metadata: PhysicsMetadata;
   risk_category: RiskCategory;
+  is_live?: boolean;
+  model_type?: string;
 }
 
 // 2D Spatial Grid Matrix Point for PINN Heatmap Surface

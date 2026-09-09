@@ -37,16 +37,12 @@ export const TimelineSlider: React.FC<TimelineSliderProps> = ({
   }, [isPlaying, currentHourOffset, onSelectHourOffset]);
 
   return (
-    <footer className="h-[64px] w-full bg-neutral-950 border-t border-neutral-800 px-6 flex items-center justify-between z-40 select-none">
+    <footer className="h-[64px] w-full bg-surface border-t border-border px-6 flex items-center justify-between z-40 select-none">
       {/* Playback Controls */}
       <div className="flex items-center gap-3">
         <button
           onClick={onTogglePlay}
-          className={`flex items-center justify-center w-8 h-8 rounded-md transition-colors ${
-            isPlaying
-              ? 'bg-neutral-800 text-neutral-100 hover:bg-neutral-700'
-              : 'bg-neutral-800 text-neutral-100 hover:bg-neutral-700'
-          }`}
+          className="flex items-center justify-center w-8 h-8 rounded-[6px] bg-surface-raised border border-border text-text-primary hover:border-border-strong hover:bg-surface transition-colors duration-150"
           title={isPlaying ? 'Pause forecast' : 'Play forecast'}
         >
           {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
@@ -54,15 +50,15 @@ export const TimelineSlider: React.FC<TimelineSliderProps> = ({
 
         <button
           onClick={() => onSelectHourOffset(0)}
-          className="p-2 rounded-md text-neutral-500 hover:text-neutral-200 hover:bg-neutral-900 transition-colors"
+          className="p-2 rounded-[6px] text-text-muted hover:text-text-primary hover:bg-surface-raised transition-colors duration-150"
           title="Reset to Now"
         >
           <RotateCcw className="w-4 h-4" />
         </button>
 
         <div className="hidden sm:block pl-1">
-          <div className="text-xs font-medium text-neutral-200">Forecast</div>
-          <div className="text-[11px] text-neutral-500">
+          <div className="text-xs font-medium text-text-primary">Forecast</div>
+          <div className="text-[11px] text-text-muted">
             Advection–diffusion projection, next 24 h
           </div>
         </div>
@@ -72,7 +68,7 @@ export const TimelineSlider: React.FC<TimelineSliderProps> = ({
       <div className="flex-1 max-w-xl mx-6">
         <div className="flex justify-between items-center relative">
           {/* Track */}
-          <div className="absolute top-1/2 left-0 right-0 h-px bg-neutral-800 -translate-y-1/2 z-0" />
+          <div className="absolute top-1/2 left-0 right-0 h-px bg-border -translate-y-1/2 z-0" />
 
           {/* Progress */}
           {(() => {
@@ -80,7 +76,7 @@ export const TimelineSlider: React.FC<TimelineSliderProps> = ({
             const percent = (index / (FORECAST_SLICES.length - 1)) * 100;
             return (
               <div
-                className="absolute top-1/2 left-0 h-px bg-sky-400/80 -translate-y-1/2 z-0 transition-all duration-300"
+                className="absolute top-1/2 left-0 h-px bg-accent -translate-y-1/2 z-0 transition-all duration-300"
                 style={{ width: `${percent}%` }}
               />
             );
@@ -96,17 +92,17 @@ export const TimelineSlider: React.FC<TimelineSliderProps> = ({
                 className="relative z-10 flex flex-col items-center group focus:outline-none"
               >
                 <div
-                  className={`rounded-full transition-all duration-200 ${
+                  className={`rounded-full transition-all duration-150 ${
                     isSelected
-                      ? 'w-3 h-3 bg-sky-400 ring-2 ring-sky-400/25'
-                      : 'w-2.5 h-2.5 bg-neutral-800 border border-neutral-600 group-hover:border-neutral-400'
+                      ? 'w-3 h-3 bg-accent ring-2 ring-accent/20'
+                      : 'w-2.5 h-2.5 bg-surface-raised border border-border-strong group-hover:border-text-muted'
                   }`}
                 />
                 <span
-                  className={`text-[11px] mt-1.5 transition-colors tnum ${
+                  className={`text-[11px] mt-1.5 transition-colors duration-150 tnum ${
                     isSelected
-                      ? 'text-sky-300 font-semibold'
-                      : 'text-neutral-500 group-hover:text-neutral-300'
+                      ? 'text-accent font-semibold'
+                      : 'text-text-muted group-hover:text-text-secondary'
                   }`}
                 >
                   {slice.label.split(' ')[0]}
@@ -121,10 +117,10 @@ export const TimelineSlider: React.FC<TimelineSliderProps> = ({
       <div className="hidden lg:flex items-center gap-4 text-xs">
         <div className="text-right">
           <div className="panel-label">Frame</div>
-          <div className="font-medium text-neutral-200 tnum">{currentSlice.label}</div>
+          <div className="font-medium text-text-primary tnum">{currentSlice.label}</div>
         </div>
-        <div className="h-5 w-px bg-neutral-800" />
-        <div className="text-neutral-400 tnum">
+        <div className="h-5 w-px bg-border" />
+        <div className="text-text-secondary tnum">
           Wind {currentSlice.wind_speed_kmh} km/h
         </div>
       </div>

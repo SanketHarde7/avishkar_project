@@ -22,7 +22,7 @@ export default function RootLayout({
           crossOrigin=""
         />
       </head>
-      <body className="bg-neutral-950 text-neutral-200 antialiased overflow-hidden min-h-screen">
+      <body className="bg-background text-text-primary antialiased overflow-hidden min-h-screen">
         {children}
       </body>
     </html>

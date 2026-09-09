@@ -1,0 +1,39 @@
+{
+  "lat_min": 18.44,
+  "lat_max": 18.65,
+  "lon_min": 73.75,
+  "lon_max": 73.98,
+  "pm25_min": 0.0,
+  "pm25_max": 250.0,
+  "train_mean": 17.492926434923202,
+  "train_std": 7.902909787069065,
+  "u_min": 1.485,
+  "u_max": 7.305,
+  "v_min": -1.82,
+  "v_max": 1.939,
+  "temp_min": 21.4,
+  "temp_max": 29.9,
+  "rh_min": 54.0,
+  "rh_max": 96.0,
+  "cams_pm25_min": 1.4,
+  "cams_pm25_max": 24.0,
+  "cams_no2_min": 1.0,
+  "cams_no2_max": 21.1,
+  "withheld_stations": [
+    "Bhosari, Pune - IITM",
+    "Panchawati_Pashan, Pune - IITM"
+  ],
+  "feature_cols": [
+    "x_norm",
+    "y_norm",
+    "t_norm",
+    "sin_hour",
+    "cos_hour",
+    "u_norm",
+    "v_norm",
+    "temp_norm",
+    "rh_norm",
+    "cams_pm25_norm",
+    "cams_no2_norm"
+  ]
+}

@@ -16,8 +16,12 @@ interface MapContainerProps {
   windDirectionDeg: number;
   u: number;
   v: number;
+  userLocation?: [number, number] | null;
   onSelectCoordinates: (lat: number, lon: number) => void;
   onSelectStation: (station: Station) => void;
+  onSelectStreet?: (lat: number, lon: number, name: string) => void;
+  onDetectLocation?: () => void;
+  isLocating?: boolean;
 }
 
 // Dynamically import Leaflet with SSR disabled to prevent `window is not defined`
@@ -26,9 +30,9 @@ const DynamicMapViewInternal = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-full flex flex-col items-center justify-center bg-neutral-950 text-neutral-500 gap-3">
-        <Loader2 className="w-6 h-6 animate-spin text-neutral-400" />
-        <div className="text-xs font-medium text-neutral-400">Loading map…</div>
+      <div className="w-full h-full flex flex-col items-center justify-center bg-background text-text-muted gap-3">
+        <Loader2 className="w-6 h-6 animate-spin text-text-secondary" />
+        <div className="text-xs font-medium text-text-secondary">Loading map…</div>
       </div>
     ),
   }
