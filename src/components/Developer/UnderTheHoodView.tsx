@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   BarChart,
   Bar,
@@ -10,119 +10,176 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import { Cpu, ShieldCheck, Activity, Layers, ArrowLeft } from 'lucide-react';
+import { Cpu, ShieldCheck, Activity, Layers, ArrowLeft, RefreshCw, AlertCircle } from 'lucide-react';
+import { fetchModelBenchmarks } from '@/lib/api';
+import { ModelBenchmarkResponse, LoocvFoldRecord } from '@/types';
 
 interface UnderTheHoodViewProps {
   onBackToMonitor: () => void;
 }
 
-// 6-Model comparative results on identical Pune holdout validation set
-const MODEL_COMPARISON = [
-  {
-    model: 'PINN (Physics-Informed)',
-    shortName: 'PINN (Ours)',
-    category: 'Physics-Informed Deep Learning',
-    mae: 4.60,
-    rmse: 6.20,
-    r2: -0.323,
-    loocvMae: 5.24,
-    physics: true,
-    highlight: true,
-    assessment: 'Lowest LOOCV error; mass-conserving spatial interpolation across unmonitored terrain.',
-  },
-  {
-    model: 'Spatial XGBoost',
-    shortName: 'XGBoost',
-    category: 'Gradient Boosted Trees',
-    mae: 3.75,
-    rmse: 4.87,
-    r2: 0.092,
-    loocvMae: 6.07,
-    physics: false,
-    assessment: 'Overfits local station clusters; degrades significantly under unmonitored wind advection.',
-  },
-  {
-    model: 'Random Forest Regressor',
-    shortName: 'Random Forest',
-    category: 'Ensemble Trees',
-    mae: 3.94,
-    rmse: 5.14,
-    r2: -0.010,
-    loocvMae: 6.18,
-    physics: false,
-    assessment: 'Piecewise constant step functions create unnatural stepping boundaries between stations.',
-  },
-  {
-    model: 'Global Mean Baseline',
-    shortName: 'Global Mean',
-    category: 'Statistical Baseline',
-    mae: 3.97,
-    rmse: 5.19,
-    r2: -0.029,
-    loocvMae: 5.77,
-    physics: false,
-    assessment: 'Completely blind to wind direction, traffic peaks, or spatial coordinates.',
-  },
-  {
-    model: 'Support Vector Regressor (SVR)',
-    shortName: 'SVR (RBF)',
-    category: 'Kernel Machine',
-    mae: 4.66,
-    rmse: 5.94,
-    r2: -0.352,
-    loocvMae: 6.35,
-    physics: false,
-    assessment: 'Radial basis kernels produce isotropic circular falloffs failing directional plume advection.',
-  },
-  {
-    model: 'Ridge Linear Model',
-    shortName: 'Ridge Reg.',
-    category: 'Regularized Linear',
-    mae: 4.69,
-    rmse: 5.96,
-    r2: -0.362,
-    loocvMae: 6.42,
-    physics: false,
-    assessment: 'Linear planes cannot capture non-linear atmospheric dispersion turbulence.',
-  },
-  {
-    model: 'K-Nearest Neighbors (KNN)',
-    shortName: 'KNN (k=5)',
-    category: 'Instance-Based',
-    mae: 4.93,
-    rmse: 6.11,
-    r2: -0.428,
-    loocvMae: 6.89,
-    physics: false,
-    assessment: 'Extreme boundary degradation when distance to nearest sensor exceeds 4 km.',
-  },
-];
+interface MergedModelItem {
+  model: string;
+  shortName: string;
+  category: string;
+  mae: number;
+  rmse: number;
+  r2: number;
+  loocvMae: number;
+  physics: boolean;
+  highlight: boolean;
+  assessment: string;
+}
 
-// 12-Station Leave-One-Out Cross-Validation summary (Full spatial coverage across Pune)
-const LOOCV_STATIONS = [
-  { station: 'Bhosari Industrial (IITM)', gm: 4.12, xgb: 4.70, pinn: 4.06, best: 'PINN' },
-  { station: 'Dhankawadi (IITM)', gm: 5.51, xgb: 4.31, pinn: 4.99, best: 'XGB' },
-  { station: 'Gavalinagar (MPCB)', gm: 3.36, xgb: 3.33, pinn: 3.15, best: 'PINN' },
-  { station: 'Hadapsar (IITM)', gm: 9.30, xgb: 9.98, pinn: 7.01, best: 'PINN' },
-  { station: 'Katraj Dairy (MPCB)', gm: 3.98, xgb: 3.57, pinn: 3.83, best: 'XGB' },
-  { station: 'Kothrud (IITM)', gm: 7.15, xgb: 7.94, pinn: 6.55, best: 'PINN' },
-  { station: 'Lohegaon (IITM)', gm: 5.86, xgb: 6.12, pinn: 4.88, best: 'PINN' },
-  { station: 'Pashan Suburban (IITM)', gm: 3.82, xgb: 3.73, pinn: 3.65, best: 'PINN' },
-  { station: 'Shivajinagar Central (IITM)', gm: 7.42, xgb: 7.85, pinn: 6.94, best: 'PINN' },
-  { station: 'Simhad Road (IITM)', gm: 6.20, xgb: 6.45, pinn: 5.82, best: 'PINN' },
-  { station: 'SPPU University (MPCB)', gm: 3.10, xgb: 3.25, pinn: 3.18, best: 'GM' },
-  { station: 'Thergaon Industrial (MPCB)', gm: 9.42, xgb: 11.30, pinn: 10.61, best: 'PINN' },
-];
+function getShortName(modelName: string): string {
+  if (modelName.includes('PINN')) return 'PINN (Ours)';
+  if (modelName.includes('XGBoost')) return 'XGBoost';
+  if (modelName.includes('Random Forest')) return 'Random Forest';
+  if (modelName.includes('Global Mean')) return 'Global Mean';
+  if (modelName.includes('Support Vector') || modelName.includes('SVR')) return 'SVR (RBF)';
+  if (modelName.includes('Ridge')) return 'Ridge Reg.';
+  if (modelName.includes('Neighbors') || modelName.includes('KNN')) return 'KNN (k=5)';
+  return modelName;
+}
 
 export const UnderTheHoodView: React.FC<UnderTheHoodViewProps> = ({ onBackToMonitor }) => {
+  const [benchmarkData, setBenchmarkData] = useState<ModelBenchmarkResponse | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeMetric, setActiveMetric] = useState<'loocvMae' | 'mae' | 'rmse'>('loocvMae');
 
-  const getBarColor = (item: typeof MODEL_COMPARISON[0]) => {
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchModelBenchmarks();
+      setBenchmarkData(data);
+    } catch (err) {
+      console.error('Failed to load benchmark models:', err);
+      setError(err instanceof Error ? err.message : 'Failed to connect to benchmark backend');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Merge holdout metrics with LOOCV metrics dynamically
+  const mergedModels: MergedModelItem[] = useMemo(() => {
+    if (!benchmarkData?.multi_model?.models) return [];
+
+    const loocvMap = new Map<string, number>();
+    (benchmarkData.loocv?.average_metrics || []).forEach((am) => {
+      const normKey = am.model.toLowerCase().replace(/[^a-z0-9]/g, '');
+      loocvMap.set(normKey, am.mae);
+    });
+
+    const list = benchmarkData.multi_model.models.map((m) => {
+      const normKey = m.model.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const loocvMae = loocvMap.get(normKey) ?? m.mae;
+      const isPinn = m.model.toLowerCase().includes('pinn');
+      return {
+        model: m.model,
+        shortName: getShortName(m.model),
+        category: m.category,
+        mae: m.mae,
+        rmse: m.rmse,
+        r2: m.r2,
+        loocvMae,
+        physics: m.physics_constrained,
+        highlight: isPinn,
+        assessment: m.description,
+      };
+    });
+
+    // Keep PINN prominently at the top, then sort others by LOOCV MAE ascending
+    return list.sort((a, b) => {
+      if (a.highlight) return -1;
+      if (b.highlight) return 1;
+      return a.loocvMae - b.loocvMae;
+    });
+  }, [benchmarkData]);
+
+  // Dynamic quick specs values
+  const pinnModel = useMemo(() => mergedModels.find((m) => m.highlight) || mergedModels[0], [mergedModels]);
+  const xgbModel = useMemo(() => mergedModels.find((m) => m.model.toLowerCase().includes('xgboost')), [mergedModels]);
+
+  const loocvImprovementPct = useMemo(() => {
+    if (!pinnModel || !xgbModel || xgbModel.loocvMae <= 0) return '0.0';
+    const pct = ((xgbModel.loocvMae - pinnModel.loocvMae) / xgbModel.loocvMae) * 100;
+    return pct.toFixed(1);
+  }, [pinnModel, xgbModel]);
+
+  const onnxLatency = benchmarkData?.loocv?.onnx_latency_ms ?? 0.05;
+  const folds = benchmarkData?.loocv?.folds || [];
+
+  const pinnWinCount = useMemo(() => {
+    return folds.filter((f) => {
+      const p = f.pinn_mae ?? 999;
+      const x = f.xgb_mae ?? 999;
+      const g = f.gm_mae ?? 999;
+      return p <= x && p <= g;
+    }).length;
+  }, [folds]);
+
+  const physicsParams = benchmarkData?.loocv?.physics_params;
+  const diffCoeff = physicsParams?.diffusion_d ?? 0.15;
+  const decayRate = physicsParams?.decay_k ?? 0.02;
+  const lambdaPhys = physicsParams?.lambda_phys ?? 0.008;
+
+  const maxActiveMetricValue = useMemo(() => {
+    if (mergedModels.length === 0) return 8;
+    const maxVal = Math.max(...mergedModels.map((m) => m[activeMetric] || 0));
+    return Math.ceil(maxVal * 1.15);
+  }, [mergedModels, activeMetric]);
+
+  const getBarColor = (item: MergedModelItem) => {
     if (item.highlight) return '#c9a24b'; // Signature brass/gold for PINN
-    if (item.category.includes('Trees')) return '#6b6f77';
+    if (item.category.includes('Trees') || item.category.includes('Learning')) return '#6b6f77';
     if (item.category.includes('Baseline')) return '#3a3d44';
     return '#4a4d55';
   };
+
+  if (loading) {
+    return (
+      <div className="w-full h-full bg-background text-text-primary p-6 space-y-6 flex flex-col justify-center items-center">
+        <div className="flex items-center gap-3 text-accent animate-pulse">
+          <RefreshCw className="w-6 h-6 animate-spin" />
+          <span className="text-sm font-mono tracking-wider">Fetching live 12-fold LOOCV metrics from backend...</span>
+        </div>
+        <p className="text-xs text-text-muted">Loading empirical benchmark distributions for all 7 models...</p>
+      </div>
+    );
+  }
+
+  if (error || !benchmarkData) {
+    return (
+      <div className="w-full h-full bg-background text-text-primary p-6 flex flex-col justify-center items-center space-y-4">
+        <div className="flex items-center gap-2 text-danger">
+          <AlertCircle className="w-5 h-5" />
+          <span className="text-sm font-semibold">Backend Benchmark Data Unavailable</span>
+        </div>
+        <p className="text-xs text-text-muted max-w-md text-center">{error}</p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={loadData}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-accent text-background text-xs font-semibold hover:bg-accent-hover transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Retry Connection</span>
+          </button>
+          <button
+            onClick={onBackToMonitor}
+            className="px-3 py-1.5 rounded-[4px] bg-surface-raised border border-border text-text-secondary text-xs hover:text-text-primary transition-colors"
+          >
+            Back to Live Monitor
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-full bg-background text-text-primary overflow-y-auto custom-scrollbar p-6 space-y-6">
@@ -145,7 +202,7 @@ export const UnderTheHoodView: React.FC<UnderTheHoodViewProps> = ({ onBackToMoni
             Model Validation & Physics Constraint Architecture
           </h2>
           <p className="text-xs text-text-secondary mt-0.5">
-            Rigorously evaluating PINN vs 6 standard ML & statistical baselines across 12 monitoring stations in Pune.
+            Rigorously evaluating PINN vs {mergedModels.length > 1 ? mergedModels.length - 1 : 6} standard ML & statistical baselines across {folds.length} monitoring stations in Pune.
           </p>
         </div>
 
@@ -153,12 +210,18 @@ export const UnderTheHoodView: React.FC<UnderTheHoodViewProps> = ({ onBackToMoni
         <div className="flex items-center gap-3 font-mono text-xs">
           <div className="bg-surface rounded-[2px] p-2.5 border border-border text-right">
             <div className="panel-label">LOOCV Gen. Error</div>
-            <div className="text-base font-semibold text-accent tnum">5.24 µg/m³</div>
-            <div className="text-[10px] text-text-muted">13.7% lower than XGBoost</div>
+            <div className="text-base font-semibold text-accent tnum">
+              {pinnModel ? pinnModel.loocvMae.toFixed(2) : '—'} µg/m³
+            </div>
+            <div className="text-[10px] text-text-muted">
+              {loocvImprovementPct}% lower than XGBoost
+            </div>
           </div>
           <div className="bg-surface rounded-[2px] p-2.5 border border-border text-right">
             <div className="panel-label">ONNX Latency</div>
-            <div className="text-base font-semibold text-text-primary tnum">&lt; 3.2 ms</div>
+            <div className="text-base font-semibold text-text-primary tnum">
+              {onnxLatency < 0.1 ? '< 0.1 ms' : `${onnxLatency.toFixed(2)} ms`}
+            </div>
             <div className="text-[10px] text-text-muted">Single-thread CPU</div>
           </div>
         </div>
@@ -216,13 +279,13 @@ export const UnderTheHoodView: React.FC<UnderTheHoodViewProps> = ({ onBackToMoni
         <div className="h-56 w-full pt-2">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
-              data={MODEL_COMPARISON}
+              data={mergedModels}
               layout="vertical"
               margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
             >
               <XAxis
                 type="number"
-                domain={[0, 8]}
+                domain={[0, maxActiveMetricValue]}
                 stroke="#2b2d33"
                 tick={{ fill: '#6b6f77', fontSize: 11 }}
               />
@@ -237,22 +300,22 @@ export const UnderTheHoodView: React.FC<UnderTheHoodViewProps> = ({ onBackToMoni
                 cursor={{ fill: 'rgba(201, 162, 75, 0.04)' }}
                 content={({ active, payload }) => {
                   if (active && payload && payload.length) {
-                    const d = payload[0].payload;
+                    const d = payload[0].payload as MergedModelItem;
                     return (
                       <div className="bg-surface border border-border-strong p-3 rounded-[2px] text-xs text-text-primary space-y-1">
                         <div className="font-semibold text-text-primary">{d.model}</div>
                         <div className="text-[11px] text-text-muted">{d.category}</div>
                         <div className="pt-1.5 border-t border-border flex justify-between gap-4">
                           <span className="text-text-muted">LOOCV MAE:</span>
-                          <span className="font-semibold text-accent tnum">{d.loocvMae} µg/m³</span>
+                          <span className="font-semibold text-accent tnum">{d.loocvMae.toFixed(2)} µg/m³</span>
                         </div>
                         <div className="flex justify-between gap-4">
                           <span className="text-text-muted">Holdout MAE:</span>
-                          <span className="font-semibold text-text-primary tnum">{d.mae} µg/m³</span>
+                          <span className="font-semibold text-text-primary tnum">{d.mae.toFixed(2)} µg/m³</span>
                         </div>
                         <div className="flex justify-between gap-4">
                           <span className="text-text-muted">Holdout R²:</span>
-                          <span className="font-semibold text-text-primary tnum">{d.r2}</span>
+                          <span className="font-semibold text-text-primary tnum">{d.r2.toFixed(3)}</span>
                         </div>
                         <div className="pt-1 text-[11px] text-text-secondary italic max-w-xs leading-tight">
                           {d.assessment}
@@ -264,7 +327,7 @@ export const UnderTheHoodView: React.FC<UnderTheHoodViewProps> = ({ onBackToMoni
                 }}
               />
               <Bar dataKey={activeMetric} radius={[0, 3, 3, 0]} barSize={18}>
-                {MODEL_COMPARISON.map((entry, index) => (
+                {mergedModels.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={getBarColor(entry)} />
                 ))}
               </Bar>
@@ -287,7 +350,7 @@ export const UnderTheHoodView: React.FC<UnderTheHoodViewProps> = ({ onBackToMoni
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {MODEL_COMPARISON.map((m) => (
+              {mergedModels.map((m) => (
                 <tr
                   key={m.model}
                   className={m.highlight ? 'bg-accent-muted/20 font-medium' : 'hover:bg-surface-raised/40'}
@@ -298,10 +361,10 @@ export const UnderTheHoodView: React.FC<UnderTheHoodViewProps> = ({ onBackToMoni
                   </td>
                   <td className="py-2.5 text-text-muted">{m.category}</td>
                   <td className={`py-2.5 text-right tnum ${m.highlight ? 'text-accent font-semibold' : 'text-text-secondary'}`}>
-                    {m.loocvMae} µg/m³
+                    {m.loocvMae.toFixed(2)} µg/m³
                   </td>
-                  <td className="py-2.5 text-right tnum text-text-secondary">{m.mae} µg/m³</td>
-                  <td className="py-2.5 text-right tnum text-text-secondary">{m.r2}</td>
+                  <td className="py-2.5 text-right tnum text-text-secondary">{m.mae.toFixed(2)} µg/m³</td>
+                  <td className="py-2.5 text-right tnum text-text-secondary">{m.r2.toFixed(3)}</td>
                   <td className="py-2.5 text-center">
                     {m.physics ? (
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent-muted/40 text-accent border border-accent/40 font-mono">
@@ -329,10 +392,10 @@ export const UnderTheHoodView: React.FC<UnderTheHoodViewProps> = ({ onBackToMoni
             <div>
               <div className="panel-label">Spatial Cross-Validation</div>
               <h4 className="text-sm font-semibold text-text-primary mt-0.5">
-                12-Fold Leave-One-Out Station Breakdown
+                {folds.length}-Fold Leave-One-Out Station Breakdown
               </h4>
             </div>
-            <span className="text-[10px] text-text-muted font-mono">12 Active Sensors</span>
+            <span className="text-[10px] text-text-muted font-mono">{folds.length} Active Sensors</span>
           </div>
 
           <p className="text-[11px] text-text-secondary leading-relaxed">
@@ -351,28 +414,33 @@ export const UnderTheHoodView: React.FC<UnderTheHoodViewProps> = ({ onBackToMoni
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {LOOCV_STATIONS.map((row) => (
-                  <tr key={row.station} className="hover:bg-surface-raised/40">
-                    <td className="py-1.5 px-2.5 text-text-secondary font-medium">{row.station}</td>
-                    <td className="py-1.5 px-2 text-right tnum text-text-muted">{row.gm}</td>
-                    <td className="py-1.5 px-2 text-right tnum text-text-muted">{row.xgb}</td>
-                    <td className="py-1.5 px-2 text-right tnum font-semibold text-accent">{row.pinn}</td>
-                    <td className="py-1.5 px-2 text-center">
-                      <span className={`text-[9px] px-1 py-0.2 rounded font-mono ${
-                        row.best === 'PINN'
-                          ? 'bg-accent-muted/50 text-accent border border-accent/40 font-semibold'
-                          : 'bg-surface-raised text-text-muted'
-                      }`}>
-                        {row.best}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {folds.map((row: LoocvFoldRecord) => {
+                  const bestTag = row.best || (row.pinn_mae <= row.xgb_mae && row.pinn_mae <= row.gm_mae ? 'PINN' : row.xgb_mae <= row.gm_mae ? 'XGB' : 'GM');
+                  return (
+                    <tr key={row.station} className="hover:bg-surface-raised/40">
+                      <td className="py-1.5 px-2.5 text-text-secondary font-medium">{row.station}</td>
+                      <td className="py-1.5 px-2 text-right tnum text-text-muted">{row.gm_mae.toFixed(2)}</td>
+                      <td className="py-1.5 px-2 text-right tnum text-text-muted">{row.xgb_mae.toFixed(2)}</td>
+                      <td className="py-1.5 px-2 text-right tnum font-semibold text-accent">
+                        {row.pinn_mae ? row.pinn_mae.toFixed(2) : '—'}
+                      </td>
+                      <td className="py-1.5 px-2 text-center">
+                        <span className={`text-[9px] px-1 py-0.2 rounded font-mono ${
+                          bestTag === 'PINN'
+                            ? 'bg-accent-muted/50 text-accent border border-accent/40 font-semibold'
+                            : 'bg-surface-raised text-text-muted'
+                        }`}>
+                          {bestTag}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
           <div className="text-[10px] text-text-muted text-right">
-            PINN achieves lowest error in 9 of 12 unmonitored locations.
+            PINN achieves lowest error in {pinnWinCount} of {folds.length} unmonitored locations.
           </div>
         </div>
 
@@ -394,13 +462,13 @@ export const UnderTheHoodView: React.FC<UnderTheHoodViewProps> = ({ onBackToMoni
                 <span className="text-text-muted">Advection (u, v):</span> Directional wind drift
               </div>
               <div>
-                <span className="text-text-muted">Diffusion (D = 0.15):</span> Atmospheric spread
+                <span className="text-text-muted">Diffusion (D = {diffCoeff}):</span> Atmospheric spread
               </div>
               <div>
-                <span className="text-text-muted">Decay (k = 0.02):</span> Particulate deposition
+                <span className="text-text-muted">Decay (k = {decayRate}):</span> Particulate deposition
               </div>
               <div>
-                <span className="text-text-muted">Residual Loss:</span> λ_phys = 0.008
+                <span className="text-text-muted">Residual Loss:</span> λ_phys = {lambdaPhys}
               </div>
             </div>
           </div>

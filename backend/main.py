@@ -492,6 +492,18 @@ def get_benchmark():
 @app.get("/api/benchmark/models")
 def get_model_benchmarks():
     """Returns 6-algorithm validation comparisons and 12-fold LOOCV metrics."""
+    if os.path.exists(MULTI_MODEL_FILE):
+        try:
+            with open(MULTI_MODEL_FILE, "r", encoding="utf-8") as f:
+                state["multi_model_benchmark"] = json.load(f)
+        except Exception as e:
+            logger.warning(f"Failed to reload {MULTI_MODEL_FILE}: {e}")
+    if os.path.exists(LOOCV_FILE):
+        try:
+            with open(LOOCV_FILE, "r", encoding="utf-8") as f:
+                state["loocv_benchmark"] = json.load(f)
+        except Exception as e:
+            logger.warning(f"Failed to reload {LOOCV_FILE}: {e}")
     return {
         "multi_model": state.get("multi_model_benchmark", {}),
         "loocv": state.get("loocv_benchmark", {}),

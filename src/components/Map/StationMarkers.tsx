@@ -25,18 +25,18 @@ export const StationMarkers: React.FC<StationMarkersProps> = ({
         // Highlight withheld validation stations with dashed border in Judge Mode
         const markerOptions = isHiddenValidation && isJudgeMode
           ? {
-              color: '#eef0f2',
+              color: '#0f172a',
               weight: 2,
               dashArray: '4, 3',
-              fillColor: '#6b6f77',
+              fillColor: '#475569',
               fillOpacity: 0.95,
               radius: 9,
             }
           : {
-              color: '#121316',
-              weight: 1.5,
+              color: '#0f172a',
+              weight: 2,
               fillColor: aqiColor,
-              fillOpacity: 0.9,
+              fillOpacity: 0.95,
               radius: 8,
             };
 

@@ -44,7 +44,7 @@ export const Column3DLayer: React.FC<Column3DLayerProps> = ({
               width: 32px;
               height: 18px;
               background: ${color};
-              border: 1px solid rgba(255,255,255,0.4);
+              border: 1.5px solid #0f172a;
               border-radius: 9999px;
               display: flex;
               align-items: center;
@@ -54,7 +54,8 @@ export const Column3DLayer: React.FC<Column3DLayerProps> = ({
               font-weight: 700;
               font-family: monospace;
               letter-spacing: -0.02em;
-              box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+              box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+              text-shadow: 0 1px 2px rgba(0,0,0,0.7);
               z-index: 10;
               transform: translateY(6px);
             ">
@@ -66,18 +67,18 @@ export const Column3DLayer: React.FC<Column3DLayerProps> = ({
               width: 14px;
               height: ${heightPx}px;
               background: linear-gradient(90deg, ${color}cc 0%, ${color} 45%, ${color}ee 100%);
-              border-left: 1px solid rgba(255,255,255,0.25);
-              border-right: 1px solid rgba(0,0,0,0.35);
-              opacity: 0.92;
+              border-left: 1px solid rgba(0,0,0,0.2);
+              border-right: 1px solid rgba(0,0,0,0.45);
+              opacity: 0.95;
               transition: height 0.3s ease;
-              box-shadow: -3px 0 6px rgba(0,0,0,0.4);
+              box-shadow: -2px 2px 6px rgba(0,0,0,0.25);
             "></div>
 
             <!-- Ground Base Anchor Shadow -->
             <div style="
               width: 22px;
               height: 7px;
-              background: radial-gradient(ellipse at center, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 70%);
+              background: radial-gradient(ellipse at center, rgba(15,23,42,0.6) 0%, rgba(15,23,42,0) 70%);
               border-radius: 50%;
               margin-top: -3px;
             "></div>
@@ -86,13 +87,15 @@ export const Column3DLayer: React.FC<Column3DLayerProps> = ({
               <div style="
                 position: absolute;
                 bottom: -16px;
-                background: #202226;
-                border: 1px dashed #6b6f77;
-                color: #9a9ea6;
+                background: #0f172a;
+                border: 1px solid #334155;
+                color: #f8fafc;
                 font-size: 9px;
-                padding: 1px 4px;
+                font-weight: 600;
+                padding: 1px 5px;
                 border-radius: 2px;
                 white-space: nowrap;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
               ">Holdout</div>
             ` : ''}
           </div>

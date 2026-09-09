@@ -168,16 +168,17 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
         zoom={zoom}
         scrollWheelZoom={true}
         className="w-full h-full z-0"
-        style={{ background: '#121316' }}
+        style={{ background: '#f2efe9' }}
       >
         <MapViewController center={center} zoom={zoom} />
         <MapClickHandler onSelect={onSelectCoordinates} />
 
-        {/* Reliable Keyless Esri World Dark Gray Basemap (No API key, No watermark) */}
+        {/* Rich CARTO Voyager Light Basemap (Streets, Blue Water, Place Labels) */}
         <TileLayer
-          attribution='&copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-          maxZoom={16}
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          url={`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png${process.env.NEXT_PUBLIC_CARTO_API_KEY || 'cb1_33jf_1_abaefa1200bd283175014d1c' ? `?key=${process.env.NEXT_PUBLIC_CARTO_API_KEY || 'cb1_33jf_1_abaefa1200bd283175014d1c'}` : ''}`}
+          subdomains={['a', 'b', 'c', 'd']}
+          maxZoom={20}
         />
 
         {/* Smooth Continuous PINN Gradient Image Overlay */}
@@ -207,11 +208,11 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
               center={userLocation}
               radius={20}
               pathOptions={{
-                color: '#38bdf8',
+                color: '#0284c7',
                 weight: 1.5,
                 dashArray: '3, 3',
                 fillColor: '#0284c7',
-                fillOpacity: 0.2,
+                fillOpacity: 0.15,
               }}
               interactive={false}
             />
@@ -219,7 +220,7 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
               center={userLocation}
               radius={6}
               pathOptions={{
-                color: '#ffffff',
+                color: '#0f172a',
                 weight: 2,
                 fillColor: '#0284c7',
                 fillOpacity: 1,
@@ -229,18 +230,18 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
           </>
         )}
 
-        {/* Highlight User-Selected Inspection Coordinate — Precision Brass Reticle */}
+        {/* Highlight User-Selected Inspection Coordinate — Precision Reticle */}
         {selectedPrediction && (
           <>
             <CircleMarker
               center={[selectedPrediction.lat, selectedPrediction.lon]}
               radius={18}
               pathOptions={{
-                color: '#c9a24b',
+                color: '#b45309',
                 weight: 1.5,
                 dashArray: '4, 4',
-                fillColor: '#c9a24b',
-                fillOpacity: 0.15,
+                fillColor: '#f59e0b',
+                fillOpacity: 0.2,
               }}
               interactive={false}
             />
@@ -248,9 +249,9 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
               center={[selectedPrediction.lat, selectedPrediction.lon]}
               radius={6}
               pathOptions={{
-                color: '#ffffff',
-                weight: 1.5,
-                fillColor: '#c9a24b',
+                color: '#0f172a',
+                weight: 2,
+                fillColor: '#f59e0b',
                 fillOpacity: 1,
               }}
             >

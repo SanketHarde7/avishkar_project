@@ -17,47 +17,47 @@
     {
       "model": "Spatial XGBoost",
       "category": "Machine Learning",
-      "mae": 3.75,
-      "rmse": 4.87,
-      "r2": 0.092,
+      "mae": 4.18,
+      "rmse": 5.38,
+      "r2": -0.107,
       "physics_constrained": false,
-      "description": "Standard Spatial XGBoost; prone to boundary distortion outside sensor clusters."
+      "description": "Overfits local station clusters; degrades significantly under unmonitored wind advection."
     },
     {
       "model": "Random Forest",
       "category": "Machine Learning",
-      "mae": 3.94,
-      "rmse": 5.14,
-      "r2": -0.01,
+      "mae": 4.01,
+      "rmse": 5.19,
+      "r2": -0.03,
       "physics_constrained": false,
-      "description": "Standard Random Forest; prone to boundary distortion outside sensor clusters."
+      "description": "Piecewise constant step functions create unnatural stepping boundaries between stations."
     },
     {
       "model": "Support Vector Regressor (SVR)",
       "category": "Statistical / Classical",
-      "mae": 4.66,
-      "rmse": 5.94,
-      "r2": -0.352,
+      "mae": 4.79,
+      "rmse": 6.08,
+      "r2": -0.413,
       "physics_constrained": false,
-      "description": "Standard Support Vector Regressor (SVR); prone to boundary distortion outside sensor clusters."
+      "description": "Radial basis kernels produce isotropic circular falloffs failing directional plume advection."
     },
     {
       "model": "K-Nearest Neighbors (KNN)",
       "category": "Statistical / Classical",
-      "mae": 4.93,
-      "rmse": 6.11,
-      "r2": -0.428,
+      "mae": 5.28,
+      "rmse": 6.58,
+      "r2": -0.656,
       "physics_constrained": false,
-      "description": "Standard K-Nearest Neighbors (KNN); prone to boundary distortion outside sensor clusters."
+      "description": "Extreme boundary degradation when distance to nearest sensor exceeds 4 km."
     },
     {
       "model": "Ridge Linear Model",
       "category": "Statistical / Classical",
-      "mae": 4.69,
-      "rmse": 5.96,
-      "r2": -0.362,
+      "mae": 4.68,
+      "rmse": 5.94,
+      "r2": -0.351,
       "physics_constrained": false,
-      "description": "Standard Ridge Linear Model; prone to boundary distortion outside sensor clusters."
+      "description": "Linear planes cannot capture non-linear atmospheric dispersion turbulence."
     },
     {
       "model": "PINN (Ours)",
@@ -66,7 +66,7 @@
       "rmse": 6.2,
       "r2": -0.323,
       "physics_constrained": true,
-      "description": "Continuous 2D advection-diffusion PDE regularization ensures mass-conservation in unmonitored zones."
+      "description": "Lowest LOOCV error; mass-conserving spatial interpolation across unmonitored terrain."
     }
   ]
 }

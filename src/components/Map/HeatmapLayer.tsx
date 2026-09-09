@@ -9,30 +9,36 @@ interface HeatmapLayerProps {
   visible?: boolean;
 }
 
-// Bounding box for continuous PINN spatial field overlay across Pune
+// Bounding box for continuous spatial field overlay across Pune
 const PUNE_HEATMAP_BOUNDS: [[number, number], [number, number]] = [
   [18.45, 73.75],
   [18.65, 73.98],
 ];
 
 /**
- * Color Ramp:
- * - 0 - 50 AQI: rgba(34, 197, 94, 0.6) (Green)
- * - 51 - 100 AQI: rgba(234, 179, 8, 0.65) (Yellow)
- * - 101 - 150 AQI: rgba(249, 115, 22, 0.7) (Orange)
- * - 151 - 200 AQI: rgba(239, 68, 68, 0.75) (Red)
- * - 201+ AQI: rgba(168, 85, 247, 0.8) (Purple)
+ * Continuous Color & Severity-Scaled Alpha Ramp (Tuned for light basemap contrast):
+ * - 0 - 50 AQI: rgb(34, 197, 94) (Green) translucent wash (alpha ~0.18 - 0.26)
+ * - 51 - 100 AQI: rgb(234, 179, 8) (Yellow) (alpha ~0.26 - 0.44)
+ * - 101 - 150 AQI: rgb(249, 115, 22) (Orange) (alpha ~0.44 - 0.62)
+ * - 151 - 200 AQI: rgb(239, 68, 68) (Red) (alpha ~0.62 - 0.78)
+ * - 201+ AQI: rgb(168, 85, 247) (Purple) vivid focus (alpha ~0.78 - 0.88)
  */
 function getRampColor(aqi: number): { r: number; g: number; b: number; a: number } {
   if (aqi <= 50) {
-    return { r: 34, g: 197, b: 94, a: 0.6 };
+    const t = Math.max(0, Math.min(1, aqi / 50));
+    return {
+      r: 34,
+      g: 197,
+      b: 94,
+      a: 0.18 + (0.26 - 0.18) * t,
+    };
   } else if (aqi <= 100) {
     const t = (aqi - 50) / 50;
     return {
       r: Math.round(34 + (234 - 34) * t),
       g: Math.round(197 + (179 - 197) * t),
       b: Math.round(94 + (8 - 94) * t),
-      a: 0.6 + (0.65 - 0.6) * t,
+      a: 0.26 + (0.44 - 0.26) * t,
     };
   } else if (aqi <= 150) {
     const t = (aqi - 100) / 50;
@@ -40,7 +46,7 @@ function getRampColor(aqi: number): { r: number; g: number; b: number; a: number
       r: Math.round(234 + (249 - 234) * t),
       g: Math.round(179 + (115 - 179) * t),
       b: Math.round(8 + (22 - 8) * t),
-      a: 0.65 + (0.7 - 0.65) * t,
+      a: 0.44 + (0.62 - 0.44) * t,
     };
   } else if (aqi <= 200) {
     const t = (aqi - 150) / 50;
@@ -48,17 +54,25 @@ function getRampColor(aqi: number): { r: number; g: number; b: number; a: number
       r: Math.round(249 + (239 - 249) * t),
       g: Math.round(115 + (68 - 115) * t),
       b: Math.round(22 + (68 - 22) * t),
-      a: 0.7 + (0.75 - 0.7) * t,
+      a: 0.62 + (0.78 - 0.62) * t,
     };
   } else {
-    const t = Math.min(1, (aqi - 200) / 90);
+    const t = Math.min(1, (aqi - 200) / 100);
     return {
       r: Math.round(239 + (168 - 239) * t),
       g: Math.round(68 + (85 - 68) * t),
       b: Math.round(68 + (247 - 68) * t),
-      a: 0.75 + (0.8 - 0.75) * t,
+      a: 0.78 + (0.88 - 0.78) * t,
     };
   }
+}
+
+/**
+ * Smoothstep function for natural rectangular edge feathering
+ */
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
 }
 
 export const HeatmapLayer: React.FC<HeatmapLayerProps> = ({ grid, visible = true }) => {
@@ -70,71 +84,118 @@ export const HeatmapLayer: React.FC<HeatmapLayerProps> = ({ grid, visible = true
       return;
     }
 
-    const width = 640;
-    const height = 640;
+    const minLat = PUNE_HEATMAP_BOUNDS[0][0];
+    const maxLat = PUNE_HEATMAP_BOUNDS[1][0];
+    const minLon = PUNE_HEATMAP_BOUNDS[0][1];
+    const maxLon = PUNE_HEATMAP_BOUNDS[1][1];
 
-    // Offscreen rendering canvas
+    // Downsampled canvas grid (160x160) for fast, frame-rate safe execution
+    // Leaflet's ImageOverlay upscales with bilinear smoothing across the viewport
+    const width = 160;
+    const height = 160;
+
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Buffer canvas for radial stamp accumulation
-    const bufferCanvas = document.createElement('canvas');
-    bufferCanvas.width = width;
-    bufferCanvas.height = height;
-    const bCtx = bufferCanvas.getContext('2d');
-    if (!bCtx) return;
+    // Precompute normalized positions [0, 1] for all input grid points
+    const points = grid.map((pt) => ({
+      x: (pt.lon - minLon) / (maxLon - minLon),
+      y: (maxLat - pt.lat) / (maxLat - minLat),
+      aqi: pt.predicted_aqi,
+    }));
 
-    const minLat = PUNE_HEATMAP_BOUNDS[0][0];
-    const maxLat = PUNE_HEATMAP_BOUNDS[1][0];
-    const minLon = PUNE_HEATMAP_BOUNDS[0][1];
-    const maxLon = PUNE_HEATMAP_BOUNDS[1][1];
+    const numPoints = points.length;
+    const kNeighbors = Math.min(8, numPoints);
 
-    // Radial distribution radius with overlap across neighbor nodes
-    const radius = 95;
+    const imgData = ctx.createImageData(width, height);
+    const data = imgData.data;
 
-    // Render radial heat waves with Gaussian falloff
-    grid.forEach((pt) => {
-      const x = ((pt.lon - minLon) / (maxLon - minLon)) * width;
-      const y = ((maxLat - pt.lat) / (maxLat - minLat)) * height;
-      const c = getRampColor(pt.predicted_aqi);
+    // Scratch buffers for k-nearest neighbor selection
+    const bestDist = new Float32Array(kNeighbors);
+    const bestAqi = new Float32Array(kNeighbors);
 
-      const grad = bCtx.createRadialGradient(x, y, 0, x, y, radius);
-      grad.addColorStop(0, `rgba(${c.r}, ${c.g}, ${c.b}, ${c.a})`);
-      grad.addColorStop(0.35, `rgba(${c.r}, ${c.g}, ${c.b}, ${c.a * 0.75})`);
-      grad.addColorStop(0.7, `rgba(${c.r}, ${c.g}, ${c.b}, ${c.a * 0.3})`);
-      grad.addColorStop(1, `rgba(${c.r}, ${c.g}, ${c.b}, 0)`);
+    // 15% rectangular edge feathering margin
+    const featherMargin = 0.15;
 
-      bCtx.fillStyle = grad;
-      bCtx.beginPath();
-      bCtx.arc(x, y, radius, 0, Math.PI * 2);
-      bCtx.fill();
-    });
+    let pixelIdx = 0;
+    for (let py = 0; py < height; py++) {
+      const v = py / (height - 1);
+      const distY = Math.min(v, 1 - v);
+      const featherY = smoothstep(0, featherMargin, distY);
 
-    // Main canvas: draw buffer with Gaussian blur filter for fluid blending
-    ctx.filter = 'blur(18px)';
-    ctx.drawImage(bufferCanvas, 0, 0);
-    ctx.filter = 'none';
+      for (let px = 0; px < width; px++) {
+        const u = px / (width - 1);
+        const distX = Math.min(u, 1 - u);
+        const featherX = smoothstep(0, featherMargin, distX);
 
-    // Soft border feathering (vignette mask) so plume naturally dissipates
-    ctx.globalCompositeOperation = 'destination-in';
-    const vignette = ctx.createRadialGradient(
-      width / 2,
-      height / 2,
-      width * 0.28,
-      width / 2,
-      height / 2,
-      width * 0.48
-    );
-    vignette.addColorStop(0, 'rgba(0, 0, 0, 1)');
-    vignette.addColorStop(0.85, 'rgba(0, 0, 0, 0.9)');
-    vignette.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, width, height);
-    ctx.globalCompositeOperation = 'source-over';
+        // Combined natural rectangular edge feather
+        const feather = featherX * featherY;
 
+        if (feather <= 0.001) {
+          // Fully transparent outside/at the bounding box edge
+          data[pixelIdx] = 0;
+          data[pixelIdx + 1] = 0;
+          data[pixelIdx + 2] = 0;
+          data[pixelIdx + 3] = 0;
+          pixelIdx += 4;
+          continue;
+        }
+
+        // Find k-nearest grid points for local IDW interpolation
+        bestDist.fill(Infinity);
+        let exactAqi: number | null = null;
+
+        for (let i = 0; i < numPoints; i++) {
+          const dx = u - points[i].x;
+          const dy = v - points[i].y;
+          const d2 = dx * dx + dy * dy;
+
+          if (d2 < 1e-8) {
+            exactAqi = points[i].aqi;
+            break;
+          }
+
+          if (d2 < bestDist[kNeighbors - 1]) {
+            let j = kNeighbors - 2;
+            while (j >= 0 && d2 < bestDist[j]) {
+              bestDist[j + 1] = bestDist[j];
+              bestAqi[j + 1] = bestAqi[j];
+              j--;
+            }
+            bestDist[j + 1] = d2;
+            bestAqi[j + 1] = points[i].aqi;
+          }
+        }
+
+        let interpolatedAqi: number;
+        if (exactAqi !== null) {
+          interpolatedAqi = exactAqi;
+        } else {
+          let weightSum = 0;
+          let aqiWeightSum = 0;
+          for (let k = 0; k < kNeighbors; k++) {
+            // Power parameter p = 2 (inverse squared distance)
+            const w = 1 / bestDist[k];
+            aqiWeightSum += w * bestAqi[k];
+            weightSum += w;
+          }
+          interpolatedAqi = weightSum > 0 ? aqiWeightSum / weightSum : 0;
+        }
+
+        const color = getRampColor(interpolatedAqi);
+        data[pixelIdx] = color.r;
+        data[pixelIdx + 1] = color.g;
+        data[pixelIdx + 2] = color.b;
+        data[pixelIdx + 3] = Math.round(color.a * feather * 255);
+
+        pixelIdx += 4;
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
     const dataUrl = canvas.toDataURL('image/png');
     setOverlayUrl(dataUrl);
   }, [grid, visible]);
@@ -146,7 +207,7 @@ export const HeatmapLayer: React.FC<HeatmapLayerProps> = ({ grid, visible = true
       key={overlayUrl}
       url={overlayUrl}
       bounds={PUNE_HEATMAP_BOUNDS}
-      opacity={0.82}
+      opacity={0.62}
       zIndex={10}
     />
   );

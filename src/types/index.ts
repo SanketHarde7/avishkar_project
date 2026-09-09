@@ -76,6 +76,67 @@ export interface ValidationMetrics {
   metrics: BenchmarkModelMetric[];
 }
 
+export interface MultiModelItem {
+  model: string;
+  category: string;
+  mae: number;
+  rmse: number;
+  r2: number;
+  physics_constrained: boolean;
+  description: string;
+}
+
+export interface MultiModelBenchmark {
+  dataset: string;
+  withheld_validation_stations: string[];
+  models: MultiModelItem[];
+}
+
+export interface LoocvFoldRecord {
+  station: string;
+  n_samples: number;
+  gm_mae: number;
+  gm_r2?: number;
+  xgb_mae: number;
+  xgb_r2?: number;
+  pinn_mae: number;
+  pinn_r2?: number;
+  rf_mae?: number;
+  rf_r2?: number;
+  svr_mae?: number;
+  svr_r2?: number;
+  knn_mae?: number;
+  knn_r2?: number;
+  ridge_mae?: number;
+  ridge_r2?: number;
+  best?: string;
+}
+
+export interface LoocvAverageMetric {
+  model: string;
+  mae: number;
+  r2: number;
+  physics_constrained?: boolean;
+}
+
+export interface LoocvBenchmark {
+  evaluation_type: string;
+  epochs_per_fold: number;
+  onnx_latency_ms?: number;
+  physics_params?: {
+    diffusion_d: number;
+    decay_k: number;
+    lambda_phys: number;
+  };
+  folds: LoocvFoldRecord[];
+  average_metrics: LoocvAverageMetric[];
+}
+
+export interface ModelBenchmarkResponse {
+  multi_model: MultiModelBenchmark;
+  loocv: LoocvBenchmark;
+}
+
 // Spatiotemporal Forecast Slice (0h to +24h)
 export interface ForecastSlice {
   hour_offset: number;
