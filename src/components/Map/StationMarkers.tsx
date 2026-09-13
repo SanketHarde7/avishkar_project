@@ -3,7 +3,7 @@
 import React from 'react';
 import { CircleMarker, Popup, Tooltip } from 'react-leaflet';
 import { Station } from '@/types';
-import { getAqiColor } from '@/lib/mockData';
+import { getAqiColor, getAqiRiskCategory } from '@/lib/mockData';
 
 interface StationMarkersProps {
   stations: Station[];
@@ -60,7 +60,7 @@ export const StationMarkers: React.FC<StationMarkersProps> = ({
                   )}
                 </div>
                 <div className="text-[11px] text-text-muted mt-0.5 tnum">
-                  AQI <span className="font-semibold text-text-primary">{st.aqi}</span> · PM2.5{' '}
+                  AQI <span className="font-semibold text-text-primary">{st.aqi}</span> (<span className="font-medium" style={{ color: aqiColor }}>{getAqiRiskCategory(st.aqi)}</span>) · PM2.5{' '}
                   <span className="font-semibold text-text-primary">{st.pm25} µg/m³</span>
                 </div>
               </div>
@@ -85,6 +85,9 @@ export const StationMarkers: React.FC<StationMarkersProps> = ({
                     <div className="text-text-muted">Recorded AQI</div>
                     <div className="text-base font-bold tnum" style={{ color: aqiColor }}>
                       {st.aqi}
+                    </div>
+                    <div className="text-[10px] font-semibold mt-0.5" style={{ color: aqiColor }}>
+                      {getAqiRiskCategory(st.aqi)}
                     </div>
                   </div>
                   <div>

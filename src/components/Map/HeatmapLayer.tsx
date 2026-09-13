@@ -24,11 +24,12 @@ const DEFAULT_HEATMAP_BOUNDS: [[number, number], [number, number]] = [
 
 /**
  * Continuous Color Ramp calibrated to official CPCB severity breakpoints:
- * - 0 - 50 AQI: #10b981 (Emerald Green)
- * - 51 - 100 AQI: #84cc16 -> #f59e0b (Lime to Amber)
- * - 101 - 150 AQI: #f59e0b -> #f97316 (Amber to Orange)
- * - 151 - 200 AQI: #f97316 -> #ef4444 (Orange to Red)
- * - 201+ AQI: #ef4444 -> #a855f7 (Red to Vivid Purple)
+ * - 0 - 50 AQI: #10b981 (Emerald Green - Good)
+ * - 51 - 100 AQI: #84cc16 (Lime Green - Satisfactory)
+ * - 101 - 200 AQI: #eab308 (Yellow/Amber - Moderate)
+ * - 201 - 300 AQI: #f97316 (Orange - Poor)
+ * - 301 - 400 AQI: #ef4444 (Red - Very Poor)
+ * - 401+ AQI: #881337 (Deep Maroon - Severe)
  */
 function getRampColor(aqi: number): { r: number; g: number; b: number; a: number } {
   if (aqi <= 50) {
@@ -42,34 +43,41 @@ function getRampColor(aqi: number): { r: number; g: number; b: number; a: number
   } else if (aqi <= 100) {
     const t = (aqi - 50) / 50;
     return {
-      r: Math.round(132 + (245 - 132) * t),
-      g: Math.round(204 + (158 - 204) * t),
-      b: Math.round(22 + (11 - 22) * t),
-      a: 0.60 + (0.70 - 0.60) * t,
-    };
-  } else if (aqi <= 150) {
-    const t = (aqi - 100) / 50;
-    return {
-      r: Math.round(245 + (249 - 245) * t),
-      g: Math.round(158 + (115 - 158) * t),
-      b: Math.round(11 + (22 - 11) * t),
-      a: 0.70 + (0.78 - 0.70) * t,
+      r: Math.round(132 + (234 - 132) * t),
+      g: Math.round(204 + (179 - 204) * t),
+      b: Math.round(22 + (8 - 22) * t),
+      a: 0.60 + (0.68 - 0.60) * t,
     };
   } else if (aqi <= 200) {
-    const t = (aqi - 150) / 50;
+    const t = (aqi - 100) / 100;
+    return {
+      r: Math.round(234 + (249 - 234) * t),
+      g: Math.round(179 + (115 - 179) * t),
+      b: Math.round(8 + (22 - 8) * t),
+      a: 0.68 + (0.76 - 0.68) * t,
+    };
+  } else if (aqi <= 300) {
+    const t = (aqi - 200) / 100;
     return {
       r: Math.round(249 + (239 - 249) * t),
       g: Math.round(115 + (68 - 115) * t),
       b: Math.round(22 + (68 - 22) * t),
-      a: 0.78 + (0.85 - 0.78) * t,
+      a: 0.76 + (0.84 - 0.76) * t,
+    };
+  } else if (aqi <= 400) {
+    const t = (aqi - 300) / 100;
+    return {
+      r: Math.round(239 + (136 - 239) * t),
+      g: Math.round(68 + (19 - 68) * t),
+      b: Math.round(68 + (55 - 68) * t),
+      a: 0.84 + (0.90 - 0.84) * t,
     };
   } else {
-    const t = Math.min(1, (aqi - 200) / 100);
     return {
-      r: Math.round(239 + (168 - 239) * t),
-      g: Math.round(68 + (85 - 68) * t),
-      b: Math.round(68 + (247 - 68) * t),
-      a: 0.85 + (0.92 - 0.85) * t,
+      r: 136,
+      g: 19,
+      b: 55,
+      a: 0.92,
     };
   }
 }

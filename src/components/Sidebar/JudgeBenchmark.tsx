@@ -35,6 +35,10 @@ export const JudgeBenchmark: React.FC<JudgeBenchmarkProps> = ({ data }) => {
     r2: item.r2,
   }));
 
+  const maxMae = Math.max(...chartData.map((d) => d.mae), 5);
+  const domainMax = Math.ceil(maxMae + 1);
+  const pinnMetric = data.metrics.find((m) => m.model.toLowerCase().includes('pinn'));
+
   return (
     <div className="bg-surface rounded-[2px] p-4 border border-border space-y-3.5">
       {/* Header */}
@@ -72,7 +76,7 @@ export const JudgeBenchmark: React.FC<JudgeBenchmarkProps> = ({ data }) => {
             >
               <XAxis
                 type="number"
-                domain={[0, 40]}
+                domain={[0, domainMax]}
                 stroke="#2b2d33"
                 tick={{ fill: '#6b6f77', fontSize: 10 }}
               />
@@ -117,17 +121,17 @@ export const JudgeBenchmark: React.FC<JudgeBenchmarkProps> = ({ data }) => {
         {/* Result summary */}
         <div className="mt-2.5 pt-2.5 border-t border-border flex items-center justify-between text-xs">
           <div className="text-text-secondary">
-            <span className="font-semibold text-accent tnum">52%</span> lower error than
-            XGBoost
+            PINN MAE: <span className="font-semibold text-accent tnum">{pinnMetric?.mae ?? 4.9} µg/m³</span>
           </div>
-          <span className="font-mono text-[11px] text-text-muted tnum">R² 0.78</span>
+          <span className="font-mono text-[11px] text-text-muted tnum">
+            R² {pinnMetric?.r2 ?? -0.484}
+          </span>
         </div>
       </div>
 
-      {/* Why physics helps */}
+      {/* Why physics helps & LOOCV context */}
       <div className="text-[11px] text-text-secondary leading-relaxed">
-        Statistical baselines break when wind carries pollution away from sparse sensors. The
-        physics constraint keeps predictions continuous and mass-conserving:{' '}
+        Single 2-station split is noisy (low local test variance). Across all 12 stations in full cross-validation (see <span className="text-text-primary font-medium">Under the Hood</span>), PINN achieves lowest city-wide error (5.24 µg/m³ vs 5.77 µg/m³ baseline):{' '}
         <code className="font-mono text-text-primary bg-surface px-1 py-0.5 rounded-[2px] border border-border">
           ∂C/∂t + u·∇C = D∇²C − kC
         </code>

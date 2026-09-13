@@ -102,7 +102,7 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
       <div className="absolute top-3 left-[140px] right-[150px] sm:left-[155px] sm:right-[170px] md:left-[170px] md:right-[210px] lg:left-1/2 lg:-translate-x-1/2 lg:w-full lg:max-w-md z-[1000] pointer-events-auto">
         <StreetSearchBar
           onSelectLocation={onSelectStreet || onSelectCoordinates}
-          onDetectLocation={onDetectLocation || (() => {})}
+          onDetectLocation={onDetectLocation || (() => { })}
           isLocating={isLocating}
         />
       </div>
@@ -115,11 +115,10 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
         </div>
         <button
           onClick={() => setLayerMode('2d')}
-          className={`px-2.5 py-1 rounded-[6px] font-semibold transition-all text-xs ${
-            layerMode === '2d'
-              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm'
-              : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
-          }`}
+          className={`px-2.5 py-1 rounded-[6px] font-semibold transition-all text-xs ${layerMode === '2d'
+            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm'
+            : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+            }`}
           title="2D Continuous PINN Advection Heatmap"
         >
           <span className="hidden sm:inline">2D Field</span>
@@ -127,11 +126,10 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
         </button>
         <button
           onClick={() => setLayerMode('25d')}
-          className={`px-2.5 py-1 rounded-[6px] font-semibold transition-all text-xs ${
-            layerMode === '25d'
-              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm'
-              : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
-          }`}
+          className={`px-2.5 py-1 rounded-[6px] font-semibold transition-all text-xs ${layerMode === '25d'
+            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm'
+            : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+            }`}
           title="2.5D Extruded Vertical Columns (Height = Pollution)"
         >
           <span className="hidden sm:inline">2.5D Columns</span>
@@ -139,11 +137,10 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
         </button>
         <button
           onClick={() => setLayerMode('both')}
-          className={`px-2.5 py-1 rounded-[6px] font-semibold transition-all text-xs ${
-            layerMode === 'both'
-              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm'
-              : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
-          }`}
+          className={`px-2.5 py-1 rounded-[6px] font-semibold transition-all text-xs ${layerMode === 'both'
+            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm'
+            : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+            }`}
           title="Combined 2D Heatmap and 2.5D Columns"
         >
           Hybrid
@@ -159,19 +156,23 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-[#84cc16] shadow-sm" />
-          <span className="text-slate-200 font-medium tnum">51–100 Moderate</span>
+          <span className="text-slate-200 font-medium tnum">51–100 Satisfactory</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b] shadow-sm" />
-          <span className="text-slate-200 font-medium tnum">101–150 Poor</span>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#eab308] shadow-sm" />
+          <span className="text-slate-200 font-medium tnum">101–200 Moderate</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-[#f97316] shadow-sm" />
-          <span className="text-slate-200 font-medium tnum">151–200 Unhealthy</span>
+          <span className="text-slate-200 font-medium tnum">201–300 Poor</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444] shadow-sm" />
-          <span className="text-slate-200 font-medium tnum">201+ Severe</span>
+          <span className="text-slate-200 font-medium tnum">301–400 Very Poor</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-[#881337] shadow-sm" />
+          <span className="text-slate-200 font-medium tnum">401+ Severe</span>
         </div>
 
         {isJudgeMode && (
@@ -199,7 +200,9 @@ export const MapViewInternal: React.FC<MapViewInternalProps> = ({
         {/* Rich CARTO Voyager Light Basemap (Streets, Blue Water, Place Labels) */}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url={`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png${process.env.NEXT_PUBLIC_CARTO_API_KEY || 'cb1_33jf_1_abaefa1200bd283175014d1c' ? `?key=${process.env.NEXT_PUBLIC_CARTO_API_KEY || 'cb1_33jf_1_abaefa1200bd283175014d1c'}` : ''}`}
+          // below statement may be wrong so please reverify that and in root env file enter the api as NEXT_PUBLIC_CARTO_API_KEY=api_key and if 
+          // still errr then use condition as { : || ?}...
+          url={`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png${process.env.NEXT_PUBLIC_CARTO_API_KEY}`}
           subdomains={['a', 'b', 'c', 'd']}
           maxZoom={20}
         />

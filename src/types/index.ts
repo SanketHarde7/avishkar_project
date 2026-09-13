@@ -31,7 +31,7 @@ export interface PhysicsMetadata {
 }
 
 // 5.2 Point Prediction Contract
-export type RiskCategory = 'Good' | 'Moderate' | 'Poor' | 'Unhealthy' | 'Severe' | 'Hazardous';
+export type RiskCategory = 'Good' | 'Satisfactory' | 'Moderate' | 'Poor' | 'Very Poor' | 'Severe';
 
 export interface PointPrediction {
   lat: number;

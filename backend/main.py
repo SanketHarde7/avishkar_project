@@ -117,11 +117,11 @@ def calculate_aqi(pm25: float) -> int:
 
 def get_risk_category(aqi: int) -> str:
     if aqi <= 50: return "Good"
-    if aqi <= 100: return "Moderate"
-    if aqi <= 150: return "Poor"
-    if aqi <= 200: return "Unhealthy"
-    if aqi <= 300: return "Severe"
-    return "Hazardous"
+    if aqi <= 100: return "Satisfactory"
+    if aqi <= 200: return "Moderate"
+    if aqi <= 300: return "Poor"
+    if aqi <= 400: return "Very Poor"
+    return "Severe"
 
 
 def compute_atmospheric_weather(hour_offset: float = 0.0) -> Dict[str, Any]:
@@ -589,6 +589,12 @@ def get_live_weather(
 @app.get("/api/benchmark")
 def get_benchmark():
     """Returns synthetic sensor-drop validation benchmarks comparing PINN vs baselines."""
+    if os.path.exists(BENCHMARK_FILE):
+        try:
+            with open(BENCHMARK_FILE, "r", encoding="utf-8") as f:
+                state["benchmark"] = json.load(f)
+        except Exception:
+            pass
     return state["benchmark"]
 
 
